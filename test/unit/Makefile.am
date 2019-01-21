@@ -9,7 +9,7 @@
 # The template2mak.py script should be available in the tools directory of the
 # libpqxx source archive.
 #
-# Generated from template 'test/unit/Makefile.am.template'.
+# Generated from template './test/unit/Makefile.am.template'.
 ################################################################################
 #MAINTAINERCLEANFILES=Makefile.in
 
@@ -31,6 +31,7 @@ runner_SOURCES = \
   test_array.cxx \
   test_binarystring.cxx \
   test_cancel_query.cxx \
+  test_cursor.cxx \
   test_error_verbosity.cxx \
   test_errorhandler.cxx \
   test_escape.cxx \

@@ -9,7 +9,7 @@
 # The template2mak.py script should be available in the tools directory of the
 # libpqxx source archive.
 #
-# Generated from template 'win32/vc-test.mak.template'.
+# Generated from template './win32/vc-test.mak.template'.
 ################################################################################
 # Visual C++ Makefile for libpqxx test suite
 # This file was written by Bart Samwel.
@@ -140,7 +140,6 @@ OBJS= \
   $(INTDIR)\test78.obj \
   $(INTDIR)\test79.obj \
   $(INTDIR)\test82.obj \
-  $(INTDIR)\test83.obj \
   $(INTDIR)\test84.obj \
   $(INTDIR)\test86.obj \
   $(INTDIR)\test87.obj \
@@ -149,7 +148,6 @@ OBJS= \
   $(INTDIR)\test90.obj \
   $(INTDIR)\test92.obj \
   $(INTDIR)\test93.obj \
-  $(INTDIR)\test94.obj \
   $(INTDIR)\runner.obj
 
 
@@ -307,8 +305,6 @@ $(INTDIR)\test79.obj::
 	@$(CXX) $(CXX_FLAGS) test/test79.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
 $(INTDIR)\test82.obj::
 	@$(CXX) $(CXX_FLAGS) test/test82.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
-$(INTDIR)\test83.obj::
-	@$(CXX) $(CXX_FLAGS) test/test83.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
 $(INTDIR)\test84.obj::
 	@$(CXX) $(CXX_FLAGS) test/test84.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
 $(INTDIR)\test86.obj::
@@ -325,8 +321,6 @@ $(INTDIR)\test92.obj::
 	@$(CXX) $(CXX_FLAGS) test/test92.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
 $(INTDIR)\test93.obj::
 	@$(CXX) $(CXX_FLAGS) test/test93.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
-$(INTDIR)\test94.obj::
-	@$(CXX) $(CXX_FLAGS) test/test94.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
 
 
 $(INTDIR)\$(LIBPQ)::

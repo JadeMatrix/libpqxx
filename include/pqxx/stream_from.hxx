@@ -28,7 +28,6 @@ namespace pqxx
 /// Efficiently pull data directly out of a table.
 class PQXX_LIBEXPORT stream_from : public stream_base
 {
-  friend class stream_to; // for stream_to::operator<<(stream_from &)
 public:
   stream_from(
     transaction_base &,
@@ -58,8 +57,8 @@ private:
   std::string m_current_line;
   bool m_retry_line;
 
-  void setup(transaction_base &, const std::string &table_name);
-  void setup(
+  void set_up(transaction_base &, const std::string &table_name);
+  void set_up(
     transaction_base &,
     const std::string &table_name,
     const std::string &columns
@@ -103,12 +102,12 @@ template<typename Columns> stream_from::stream_from(
   transaction_base &tb,
   const std::string &table_name,
   const Columns& columns
-) : stream_from(
+) : stream_from{
   tb,
   table_name,
   std::begin(columns),
   std::end(columns)
-) {}
+} {}
 
 
 template<typename Iter> stream_from::stream_from(
@@ -117,10 +116,10 @@ template<typename Iter> stream_from::stream_from(
   Iter columns_begin,
   Iter columns_end
 ) :
-  namedclass("stream_from", table_name),
-  stream_base(tb)
+  namedclass{"stream_from", table_name},
+  stream_base{tb}
 {
-  setup(
+  set_up(
     tb,
     table_name,
     columnlist(columns_begin, columns_end)
@@ -132,7 +131,7 @@ template<typename Tuple> stream_from & stream_from::operator>>(
   Tuple &t
 )
 {
-  if (m_retry_line || get_raw_line(m_current_line))
+  if (m_retry_line or get_raw_line(m_current_line))
   {
     std::string workspace;
     try
@@ -159,13 +158,11 @@ template<typename Tuple, std::size_t I> auto stream_from::tokenize_ith(
   std::tuple_size<Tuple>::value > I
 )>::type
 {
-  if (here < line.size())
-  {
-    extract_value(line, std::get<I>(t), here, workspace);
-    tokenize_ith<Tuple, I+1>(line, t, here, workspace);
-  }
-  else
-    throw usage_error{"Too few fields to extract from stream_from line"};
+  if (here >= line.size())
+    throw usage_error{"Too few fields to extract from stream_from line."};
+
+  extract_value(line, std::get<I>(t), here, workspace);
+  tokenize_ith<Tuple, I+1>(line, t, here, workspace);
 }
 
 
@@ -179,7 +176,9 @@ template<typename Tuple, std::size_t I> auto stream_from::tokenize_ith(
 )>::type
 {
   // Zero-column line may still have a trailing newline
-  if (here < line.size() && !(here == line.size() - 1 && line[here] == '\n'))
+  if (
+	here < line.size() and
+        not (here == line.size() - 1 and line[here] == '\n'))
     throw usage_error{"Not all fields extracted from stream_from line"};
 }
 

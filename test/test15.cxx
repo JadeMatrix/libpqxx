@@ -11,40 +11,25 @@ using namespace pqxx;
 
 namespace
 {
-class ReadTables : public transactor<nontransaction>
+void test_015()
 {
-  result m_result;
-public:
-  ReadTables() : transactor<nontransaction>("ReadTables") {}
-
-  void operator()(argument_type &T)
-  {
-    m_result = T.exec("SELECT * FROM pg_tables");
-  }
-
-  void on_commit()
-  {
-    for (const auto &c: m_result)
-    {
-      string N;
-      c[0].to(N);
-      cout << '\t' << to_string(c.num()) << '\t' << N << endl;
-    }
-  }
-};
-
-
-void test_015(transaction_base &orgT)
-{
-  connection_base &C(orgT.conn());
-  orgT.abort();
+  connection conn;
 
   // See if deactivate() behaves...
-  C.deactivate();
+#include <pqxx/internal/ignore-deprecated-pre.hxx>
+  conn.deactivate();
+#include <pqxx/internal/ignore-deprecated-post.hxx>
 
-  C.perform(ReadTables());
+  perform(
+    [&conn]()
+    {
+      nontransaction tx{conn};
+      const auto r = tx.exec("SELECT * FROM generate_series(1, 5)");
+      PQXX_CHECK_EQUAL(r.size(), 5ul, "Weird query result.");
+      tx.commit();
+    });
 }
 
-} // namespace
 
-PQXX_REGISTER_TEST_T(test_015, nontransaction)
+PQXX_REGISTER_TEST(test_015);
+} // namespace

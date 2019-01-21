@@ -37,45 +37,17 @@ public:
 };
 
 
-// A transactor to trigger our notification listener
-class Notify : public transactor<>
-{
-  string m_channel;
-
-public:
-  explicit Notify(string NotifName) :
-    transactor<>("Notifier"), m_channel(NotifName) { }
-
-  void operator()(argument_type &T)
-  {
-    T.exec("NOTIFY " + m_channel);
-  }
-
-  void on_abort(const char Reason[]) noexcept
-  {
-    try
-    {
-      cerr << "Notify failed!" << endl;
-      if (Reason) cerr << "Reason: " << Reason << endl;
-    }
-    catch (const exception &)
-    {
-    }
-  }
-};
-
-
-void test_023(transaction_base &)
+void test_023()
 {
   lazyconnection C;
   cout << "Adding listener..." << endl;
-  TestListener L(C);
+  TestListener L{C};
 
   cout << "Sending notification..." << endl;
-  C.perform(Notify(L.channel()));
+  perform([&C, &L](){ nontransaction{C}.exec("NOTIFY " + L.channel()); });
 
   int notifs = 0;
-  for (int i=0; (i < 20) && !L.done(); ++i)
+  for (int i=0; (i < 20) and not L.done(); ++i)
   {
     PQXX_CHECK_EQUAL(notifs, 0, "Got unexpected notifications.");
     pqxx::internal::sleep_seconds(1);
@@ -88,6 +60,7 @@ void test_023(transaction_base &)
 
   PQXX_CHECK_EQUAL(notifs, 1, "Unexpected number of notifications.");
 }
-} // namespace
 
-PQXX_REGISTER_TEST_NODB(test_023)
+
+PQXX_REGISTER_TEST(test_023);
+} // namespace

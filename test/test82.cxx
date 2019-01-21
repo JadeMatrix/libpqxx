@@ -9,14 +9,17 @@ using namespace pqxx;
 // Test program for libpqxx.  Read and print table using row iterators.
 namespace
 {
-void test_082(transaction_base &T)
+void test_082()
 {
-  test::create_pqxxevents(T);
-  const string Table = "pqxxevents";
-  result R( T.exec("SELECT * FROM " + Table) );
-  T.conn().disconnect();
+  connection conn;
+  nontransaction tx{conn};
 
-  PQXX_CHECK(!R.empty(), "Got empty result.");
+  test::create_pqxxevents(tx);
+  const string Table = "pqxxevents";
+  result R{ tx.exec("SELECT * FROM " + Table) };
+  conn.disconnect();
+
+  PQXX_CHECK(not R.empty(), "Got empty result.");
 
   const string nullstr("[null]");
 
@@ -50,7 +53,7 @@ void test_082(transaction_base &T)
     PQXX_CHECK(f3 > r.begin(), "Row end() appears to precede its begin().");
 
     PQXX_CHECK(
-	f3 >= r.end() && r.begin() < f3,
+	f3 >= r.end() and r.begin() < f3,
 	"Row iterator operator<() is broken.");
 
     PQXX_CHECK(f3 > r.begin(), "Row end() not greater than begin().");
@@ -105,7 +108,7 @@ void test_082(transaction_base &T)
   PQXX_CHECK(ri2 == ri3 - 0, "reverse_iterator-0 gives strange result.");
 
   PQXX_CHECK(
-	!(ri3 < ri2),
+	not (ri3 < ri2),
 	"reverse_iterator operator<() breaks on identical iterators.");
   PQXX_CHECK(
 	ri2 <= ri3,
@@ -168,4 +171,5 @@ void test_082(transaction_base &T)
 }
 } // namespace
 
-PQXX_REGISTER_TEST_T(test_082, nontransaction)
+
+PQXX_REGISTER_TEST(test_082);

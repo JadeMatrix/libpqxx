@@ -4,23 +4,25 @@ using namespace std;
 using namespace pqxx;
 
 
-// Test program for libpqxx.  Modify the database inside a NonTransaction, and
-// verify that the change gets made regardless of whether the NonTransaction is
-// eventually committed or aborted.  An asynchronous connection is used.
+// Test: nontransaction changes are committed immediately (tested here against
+// an asyncconnection).
 namespace
 {
 int BoringYear = 1977;
 
 
-void test_066(transaction_base &T1)
+void test_066()
 {
-  test::create_pqxxevents(T1);
-  connection_base &C(T1.conn());
+  asyncconnection conn;
+  nontransaction tx1{conn};
+
+  test::create_pqxxevents(tx1);
+
   const string Table = "pqxxevents";
 
   // Verify our start condition before beginning: there must not be a 1977
   // record already.
-  result R( T1.exec("SELECT * FROM " + Table + " "
+  result R( tx1.exec("SELECT * FROM " + Table + " "
 	            "WHERE year=" + to_string(BoringYear)) );
 
   PQXX_CHECK_EQUAL(
@@ -33,21 +35,21 @@ void test_066(transaction_base &T1)
   PQXX_CHECK(R.empty(), "Result is not empty after clear().");
 
   // OK.  Having laid that worry to rest, add a record for 1977.
-  T1.exec0(
+  tx1.exec0(
 	"INSERT INTO " + Table + " VALUES"
         "(" +
 	to_string(BoringYear) + ","
 	"'Yawn'"
 	")");
 
-  // Abort T1.  Since T1 is a NonTransaction, which provides only the
+  // Abort T1.  Since T1 is a nontransaction, which provides only the
   // transaction class interface without providing any form of transactional
   // integrity, this is not going to undo our work.
-  T1.abort();
+  tx1.abort();
 
   // Verify that our record was added, despite the Abort()
-  nontransaction T2(C, "T2");
-  R = T2.exec("SELECT * FROM " + Table + " "
+  nontransaction tx2(conn, "tx2");
+  R = tx2.exec("SELECT * FROM " + Table + " "
 	"WHERE year=" + to_string(BoringYear));
   PQXX_CHECK_EQUAL(
 	R.size(),
@@ -60,22 +62,23 @@ void test_066(transaction_base &T1)
   PQXX_CHECK(R.empty(), "result::clear() doesn't always work.");
 
   // Now remove our record again
-  T2.exec0(
+  tx2.exec0(
 	"DELETE FROM " + Table + " "
 	"WHERE year=" + to_string(BoringYear));
 
-  T2.commit();
+  tx2.commit();
 
   // And again, verify results
-  nontransaction T3(C, "T3");
+  nontransaction tx3(conn, "tx3");
 
-  R = T3.exec("SELECT * FROM " + Table + " "
+  R = tx3.exec("SELECT * FROM " + Table + " "
 	      "WHERE year=" + to_string(BoringYear));
   PQXX_CHECK_EQUAL(
 	R.size(),
 	0u,
 	"Deleted row still seems to be there.");
 }
-} // namespace
 
-PQXX_REGISTER_TEST_CT(test_066, asyncconnection, nontransaction)
+
+PQXX_REGISTER_TEST(test_066);
+} // namespace

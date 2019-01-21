@@ -17,7 +17,7 @@
 #include "pqxx/compiler-internal-pre.hxx"
 #include "pqxx/transaction_base.hxx"
 #include "pqxx/stream_base.hxx"
-#include "pqxx/stream_from"
+#include "pqxx/stream_from.hxx"
 #include "pqxx/internal/type_utils.hxx"
 
 #include <string>
@@ -29,7 +29,6 @@ namespace pqxx
 /// Efficiently write data directly to a database table.
 class PQXX_LIBEXPORT stream_to : public stream_base
 {
-  friend class stream_from; // for operator<<(stream_from &)
 public:
   stream_to(
     transaction_base &,
@@ -53,21 +52,23 @@ public:
 
   void write_raw_line(const std::string &);
   template<typename Tuple> stream_to & operator<<(const Tuple &);
-  // This is mostly useful for copying data between databases or servers, as
-  // executing a query to copy the data within a single database will be much
-  // more efficient
+
+  /// Stream a `stream_from` straight into a `stream_to`.
+  /** This can be useful when copying between different databases.  If the
+   * source and the destination are on the same database, you'll get better
+   * performance doing it all in a regular query.
+   */
   stream_to &operator<<(stream_from &);
 
 private:
-  void setup(transaction_base &, const std::string &table_name);
-  void setup(
+  void set_up(transaction_base &, const std::string &table_name);
+  void set_up(
     transaction_base &,
     const std::string &table_name,
     const std::string &columns
   );
 
   void close() override;
-
 };
 
 
@@ -75,12 +76,12 @@ template<typename Columns> stream_to::stream_to(
   transaction_base &tb,
   const std::string &table_name,
   const Columns& columns
-) : stream_to(
+) : stream_to{
   tb,
   table_name,
   std::begin(columns),
   std::end(columns)
-)
+}
 {}
 
 
@@ -90,10 +91,10 @@ template<typename Iter> stream_to::stream_to(
   Iter columns_begin,
   Iter columns_end
 ) :
-  namedclass("stream_from", table_name),
-  stream_base(tb)
+  namedclass{"stream_from", table_name},
+  stream_base{tb}
 {
-  setup(
+  set_up(
     tb,
     table_name,
     columnlist(columns_begin, columns_end)

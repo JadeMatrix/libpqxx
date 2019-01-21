@@ -10,35 +10,19 @@ using namespace pqxx;
 // a dummy transaction to gain nontransactional access, and perform a query.
 namespace
 {
-class ReadTables : public transactor<nontransaction>
+void test_017()
 {
-  result m_result;
-public:
-  ReadTables() : transactor<nontransaction>("ReadTables") {}
-
-  void operator()(argument_type &T)
-  {
-    m_result = T.exec("SELECT * FROM pg_tables");
-  }
-
-  void on_commit()
-  {
-    for (const auto &c: m_result)
+  connection conn;
+  perform(
+    [&conn]()
     {
-      string N;
-      c[0].to(N);
-      cout << '\t' << to_string(c.num()) << '\t' << N << endl;
-    }
-  }
-};
-
-
-void test_017(transaction_base &T)
-{
-  connection_base &C(T.conn());
-  T.abort();
-  C.perform(ReadTables());
+      nontransaction tx{conn};
+      const auto r = tx.exec("SELECT * FROM generate_series(1, 4)");
+      PQXX_CHECK_EQUAL(r.size(), 4ul, "Weird query result.");
+      tx.commit();
+    });
 }
-} // namespace
 
-PQXX_REGISTER_TEST_T(test_017, nontransaction)
+
+PQXX_REGISTER_TEST(test_017);
+} // namespace

@@ -38,6 +38,7 @@ nobase_include_HEADERS= pqxx/pqxx \
 	pqxx/internal/callgate.hxx \
 	pqxx/internal/encoding_group.hxx \
 	pqxx/internal/libpq-forward.hxx \
+	pqxx/internal/sql_cursor.hxx \
 	pqxx/internal/statement_parameters.hxx \
 	pqxx/internal/type_utils.hxx \
 	pqxx/internal/gates/connection-dbtransaction.hxx \
@@ -57,10 +58,13 @@ nobase_include_HEADERS= pqxx/pqxx \
 	pqxx/internal/gates/result-creation.hxx \
 	pqxx/internal/gates/result-row.hxx \
 	pqxx/internal/gates/result-sql_cursor.hxx \
+	pqxx/internal/gates/transaction-sql_cursor.hxx \
 	pqxx/internal/gates/transaction-subtransaction.hxx \
 	pqxx/internal/gates/transaction-tablereader.hxx \
 	pqxx/internal/gates/transaction-tablewriter.hxx \
-	pqxx/internal/gates/transaction-transactionfocus.hxx
+	pqxx/internal/gates/transaction-transactionfocus.hxx \
+	pqxx/internal/ignore-deprecated-pre.hxx \
+	pqxx/internal/ignore-deprecated-post.hxx
 
 
 nobase_nodist_include_HEADERS = \

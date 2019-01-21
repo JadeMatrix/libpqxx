@@ -49,7 +49,7 @@ public:
    * large object identity.  Does not affect the database.
    * @param O Object identifier for the given object
    */
-  explicit largeobject(oid O) noexcept : m_id(O) {}			//[t48]
+  explicit largeobject(oid O) noexcept : m_id{O} {}			//[t48]
 
   /// Import large object from a local file
   /** Creates a large object containing the data found in the given file.
@@ -363,10 +363,10 @@ public:
 	largeobject O,
 	openmode mode=std::ios::in|std::ios::out,
 	size_type BufSize=512) :
-    m_bufsize(BufSize),
-    m_obj(T, O, mode),
-    m_g(nullptr),
-    m_p(nullptr)
+    m_bufsize{BufSize},
+    m_obj{T, O, mode},
+    m_g{nullptr},
+    m_p{nullptr}
 	{ initialize(mode); }
 
   largeobject_streambuf(						//[t48]
@@ -374,10 +374,10 @@ public:
 	oid O,
 	openmode mode=std::ios::in|std::ios::out,
 	size_type BufSize=512) :
-    m_bufsize(BufSize),
-    m_obj(T, O, mode),
-    m_g(nullptr),
-    m_p(nullptr)
+    m_bufsize{BufSize},
+    m_obj{T, O, mode},
+    m_g{nullptr},
+    m_p{nullptr}
 	{ initialize(mode); }
 
   virtual ~largeobject_streambuf() noexcept
@@ -415,7 +415,7 @@ protected:
   virtual int_type overflow(int_type ch = EoF()) override
   {
     char *const pp = this->pptr();
-    if (!pp) return EoF();
+    if (pp == nullptr) return EoF();
     char *const pb = this->pbase();
     int_type res = 0;
 
@@ -433,12 +433,12 @@ protected:
 
   virtual int_type underflow() override
   {
-    if (!this->gptr()) return EoF();
+    if (this->gptr() == nullptr) return EoF();
     char *const eb = this->eback();
     const int_type res(static_cast<int_type>(
 	AdjustEOF(m_obj.cread(this->eback(), m_bufsize))));
     this->setg(eb, eb, eb + ((res==EoF()) ? 0 : res));
-    return (!res || (res == EoF())) ? EoF() : *eb;
+    return ((res == 0) or (res == EoF())) ? EoF() : *eb;
   }
 
 private:
@@ -504,8 +504,8 @@ public:
 	dbtransaction &T,
         largeobject O,
 	largeobject::size_type BufSize=512) :
-    super(nullptr),
-    m_buf(T, O, std::ios::in, BufSize)
+    super{nullptr},
+    m_buf{T, O, std::ios::in, BufSize}
 	{ super::init(&m_buf); }
 
   /// Create a basic_ilostream
@@ -518,8 +518,8 @@ public:
 	dbtransaction &T,
         oid O,
 	largeobject::size_type BufSize=512) :
-    super(nullptr),
-    m_buf(T, O, std::ios::in, BufSize)
+    super{nullptr},
+    m_buf{T, O, std::ios::in, BufSize}
 	{ super::init(&m_buf); }
 
 private:
@@ -560,8 +560,8 @@ public:
 	dbtransaction &T,
         largeobject O,
 	largeobject::size_type BufSize=512) :
-    super(nullptr),
-    m_buf(T, O, std::ios::out, BufSize)
+    super{nullptr},
+    m_buf{T, O, std::ios::out, BufSize}
 	{ super::init(&m_buf); }
 
   /// Create a basic_olostream
@@ -574,8 +574,8 @@ public:
 	dbtransaction &T,
 	oid O,
 	largeobject::size_type BufSize=512) :
-    super(nullptr),
-    m_buf(T, O, std::ios::out, BufSize)
+    super{nullptr},
+    m_buf{T, O, std::ios::out, BufSize}
 	{ super::init(&m_buf); }
 
   ~basic_olostream()
@@ -629,8 +629,8 @@ public:
 	dbtransaction &T,
 	largeobject O,
 	largeobject::size_type BufSize=512) :
-    super(nullptr),
-    m_buf(T, O, std::ios::in | std::ios::out, BufSize)
+    super{nullptr},
+    m_buf{T, O, std::ios::in | std::ios::out, BufSize}
 	{ super::init(&m_buf); }
 
   /// Create a basic_lostream
@@ -643,8 +643,8 @@ public:
 	dbtransaction &T,
 	oid O,
 	largeobject::size_type BufSize=512) :
-    super(nullptr),
-    m_buf(T, O, std::ios::in | std::ios::out, BufSize)
+    super{nullptr},
+    m_buf{T, O, std::ios::in | std::ios::out, BufSize}
 	{ super::init(&m_buf); }
 
   ~basic_lostream()

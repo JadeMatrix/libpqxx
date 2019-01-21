@@ -2,7 +2,7 @@
  *
  * DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/field instead.
  *
- * Copyright (c) 2018, Jeroen T. Vermeulen.
+ * Copyright (c) 2019, Jeroen T. Vermeulen.
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -13,6 +13,9 @@
 
 #include "pqxx/compiler-public.hxx"
 #include "pqxx/compiler-internal-pre.hxx"
+
+#include "pqxx/internal/encoding_group.hxx"
+#include "pqxx/internal/encodings.hxx"
 
 #include <stdexcept>
 #include <string>
@@ -58,8 +61,11 @@ public:
     done,
   };
 
+// XXX: Actually _pass_ encoding group!
   /// Constructor.  You don't need this; use @c field::as_array instead.
-  explicit array_parser(const char input[]);
+  explicit array_parser(
+	const char input[],
+	internal::encoding_group=internal::encoding_group::MONOBYTE);
 
   /// Parse the next step in the array.
   /** Returns what it found.  If the juncture is @c string_value, the string
@@ -70,8 +76,24 @@ public:
   std::pair<juncture, std::string> get_next();
 
 private:
+  const char *const m_input;
+  const std::string::size_type m_end;
+  internal::glyph_scanner_func *const m_scan;
+
   /// Current parsing position in the input.
-  const char *m_pos;
+  std::string::size_type m_pos;
+
+  std::string::size_type scan_single_quoted_string() const;
+  std::string parse_single_quoted_string(std::string::size_type end) const;
+  std::string::size_type scan_double_quoted_string() const;
+  std::string parse_double_quoted_string(std::string::size_type end) const;
+  std::string::size_type scan_unquoted_string() const;
+  std::string parse_unquoted_string(std::string::size_type end) const;
+
+  std::string::size_type scan_glyph(std::string::size_type pos) const;
+  std::string::size_type scan_glyph(
+	std::string::size_type pos,
+	std::string::size_type end) const;
 };
 } // namespace pqxx
 

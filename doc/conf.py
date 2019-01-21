@@ -57,7 +57,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'libpqxx'
-copyright = u'2017, Jeroen T. Vermeulen'
+copyright = u'2000-2019, Jeroen T. Vermeulen'
 author = u'Jeroen T. Vermeulen'
 
 
@@ -128,7 +128,11 @@ html_sidebars = {
     ]
 }
 
-html_extra_path = ['html/Reference']
+# Looks like the setup is that our build generates the HTML itself, and then
+# has readthedocs copy the full generated HTML tree to the output directory.
+#
+# Problem is, that doesn't seem to be working now.  This needs debugging.
+html_extra_path = ["html/Reference"]
 
 # -- Options for HTMLHelp output ------------------------------------------
 

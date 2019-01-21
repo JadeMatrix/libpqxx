@@ -3,7 +3,7 @@
  *
  * DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/transaction instead.
  *
- * Copyright (c) 2001-2018, Jeroen T. Vermeulen.
+ * Copyright (c) 2001-2019, Jeroen T. Vermeulen.
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -91,7 +91,7 @@ public:
    * may contain letters and digits only
    */
   explicit transaction(connection_base &C, const std::string &TName):	//[t01]
-    namedclass(fullname("transaction", isolation_tag::name()), TName),
+    namedclass{fullname("transaction", isolation_tag::name()), TName},
     internal::basic_transaction(C, isolation_tag::name(), READWRITE)
 	{ Begin(); }
 
@@ -110,9 +110,7 @@ using work = transaction<>;
 using read_transaction = transaction<read_committed, read_only>;
 
 //@}
-
 }
 
 #include "pqxx/compiler-internal-post.hxx"
-
 #endif

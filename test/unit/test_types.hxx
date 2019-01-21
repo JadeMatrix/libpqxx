@@ -13,21 +13,51 @@
 #include <vector>
 
 
-union ipv4
+class ipv4
 {
-  uint32_t as_int;
-  unsigned char as_bytes[4];
-
-  ipv4() : as_int{0x00} {}
-  ipv4(const ipv4& o) : as_int{o.as_int} {}
-  ipv4(uint32_t i) : as_int{i} {}
+public:
+  ipv4() : m_as_int{0u} {}
+  ipv4(const ipv4 &) =default;
+  ipv4(ipv4 &&) =default;
+  explicit ipv4(uint32_t i) : m_as_int{i} {}
   ipv4(
     unsigned char b1,
     unsigned char b2,
     unsigned char b3,
     unsigned char b4
-  ) : as_bytes{b1, b2, b3, b4} {}
-  bool operator ==(const ipv4 &o) const { return as_int == o.as_int; }
+  ) :
+    m_as_int{uint32_t(b1) << 24 | uint32_t(b2) << 16 | uint32_t(b3) << 8 | b4}
+  {}
+
+  bool operator==(const ipv4 &o) const { return m_as_int == o.m_as_int; }
+  ipv4 &operator=(const ipv4 &) =default;
+
+  /// Index bytes, from 0 to 3, in network (i.e. Big-Endian) byte order.
+  unsigned int operator[](int byte) const
+  {
+    if (byte < 0 or byte > 3)
+        throw pqxx::usage_error("Byte out of range.");
+    const auto shift = compute_shift(byte);
+    return static_cast<unsigned char>((m_as_int >> shift) & 0xff);
+  }
+
+  /// Set individual byte, in network byte order.
+  void set_byte(int byte, uint32_t value)
+  {
+    const auto shift = unsigned(compute_shift(byte));
+    const auto blanked = m_as_int & ~uint32_t(0xff << shift);
+    m_as_int = blanked | ((value & 0xff) << shift);
+  }
+
+private:
+  static uint32_t compute_shift(int byte)
+  {
+    if (byte < 0 or byte > 3)
+        throw pqxx::usage_error("Byte out of range.");
+    return uint32_t((3 - byte) * 8);
+  }
+
+  uint32_t m_as_int;
 };
 
 
@@ -40,6 +70,7 @@ template<typename T> class custom_optional
 private:
   union
   {
+    // "Blank" member just so no T object needs to be constructed here.
     void *_;
     T value;
   };
@@ -70,7 +101,7 @@ public:
   custom_optional &operator =(const custom_optional &o)
   {
     if (&o == this) return *this;
-    if (has_value && o.has_value)
+    if (has_value and o.has_value)
       value = o.value;
     else
     {
@@ -89,7 +120,9 @@ public:
 };
 
 
-template<> struct pqxx::string_traits<ipv4>
+namespace pqxx
+{
+template<> struct string_traits<ipv4>
 {
   using subject_type = ipv4;
 
@@ -109,21 +142,21 @@ template<> struct pqxx::string_traits<ipv4>
 
   static void from_string(const char str[], subject_type &ts)
   {
-    if (!str) internal::throw_null_conversion(name());
+    if (str == nullptr) internal::throw_null_conversion(name());
     std::regex ipv4_regex{
       "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})"
     };
     std::smatch match;
     // Need non-temporary for `std::regex_match()`
     std::string sstr{str};
-    if (!std::regex_match(sstr, match, ipv4_regex) || match.size() != 5)
+    if (not std::regex_match(sstr, match, ipv4_regex) or match.size() != 5)
       throw std::runtime_error{
         "invalid ipv4 format: " + std::string{str}
       };
     try
     {
       for (std::size_t i{0}; i < 4; ++i)
-        ts.as_bytes[i] = static_cast<unsigned char>(std::stoi(match[i+1]));
+        ts.set_byte(int(i), uint32_t(std::stoi(match[i+1])));
     }
     catch (const std::invalid_argument&)
     {
@@ -141,29 +174,32 @@ template<> struct pqxx::string_traits<ipv4>
 
   static std::string to_string(const subject_type &ts)
   {
-    return (
-        std::to_string(static_cast<int>(ts.as_bytes[0]))
+    return
+      std::to_string(ts[0])
       + "."
-      + std::to_string(static_cast<int>(ts.as_bytes[1]))
+      + std::to_string(ts[1])
       + "."
-      + std::to_string(static_cast<int>(ts.as_bytes[2]))
+      + std::to_string(ts[2])
       + "."
-      + std::to_string(static_cast<int>(ts.as_bytes[3]))
-    );
+      + std::to_string(ts[3])
+    ;
   }
 };
+} // namespace pqxx
 
 
-template<> struct pqxx::string_traits<bytea>
+namespace pqxx
+{
+template<> struct string_traits<bytea>
 {
 private:
   static unsigned char from_hex(char c)
   {
-    if (c >= '0' && c <= '9')
+    if (c >= '0' and c <= '9')
       return static_cast<unsigned char>(c - '0');
-    else if (c >= 'a' && c <= 'f')
+    else if (c >= 'a' and c <= 'f')
       return static_cast<unsigned char>(c - 'a' + 10);
-    else if (c >= 'A' && c <= 'F')
+    else if (c >= 'A' and c <= 'F')
       return static_cast<unsigned char>(c - 'A' + 10);
     else
       throw std::range_error{
@@ -197,10 +233,10 @@ public:
 
   static void from_string(const char str[], subject_type& bs)
   {
-    if (!str)
+    if (str == nullptr)
       internal::throw_null_conversion(name());
     auto len = strlen(str);
-    if (len % 2 || len < 2 || str[0] != '\\' || str[1] != 'x')
+    if (len % 2 or len < 2 or str[0] != '\\' or str[1] != 'x')
       throw std::runtime_error{
         "invalid bytea format: " + std::string{str}
       };
@@ -225,3 +261,4 @@ public:
     return s.str();
   }
 };
+} // namespace pqxx

@@ -14,8 +14,6 @@
 
 namespace
 {
-
-
 std::string truncate_sql_error(const std::string &what)
 {
   auto trunc = what.substr(0, what.find('\n'));
@@ -173,13 +171,12 @@ void test_optional(pqxx::connection_base& connection)
 }
 
 
-void test_stream_to(pqxx::transaction_base &nontrans)
+void test_stream_to()
 {
-  auto& connection = nontrans.conn();
-  nontrans.abort();
+  pqxx::connection conn;
+  pqxx::work tx{conn};
 
-  pqxx::work transaction{connection};
-  transaction.exec(
+  tx.exec(
     "CREATE TEMP TABLE stream_to_test ("
     "number0 INT NOT NULL,"
     "ts1     TIMESTAMP NULL,"
@@ -189,27 +186,25 @@ void test_stream_to(pqxx::transaction_base &nontrans)
     "bin5    BYTEA NOT NULL"
     ")"
   );
-  transaction.commit();
+  tx.commit();
 
-  test_nonoptionals(connection);
-  test_bad_null(connection);
-  test_too_few_fields(connection);
-  test_too_many_fields(connection);
+  test_nonoptionals(conn);
+  test_bad_null(conn);
+  test_too_few_fields(conn);
+  test_too_many_fields(conn);
   std::cout << "testing `std::unique_ptr` as optional...\n";
-  test_optional<std::unique_ptr>(connection);
+  test_optional<std::unique_ptr>(conn);
   std::cout << "testing `custom_optional` as optional...\n";
-  test_optional<custom_optional>(connection);
-  #if defined PQXX_HAVE_OPTIONAL
+  test_optional<custom_optional>(conn);
+#if defined PQXX_HAVE_OPTIONAL
   std::cout << "testing `std::optional` as optional...\n";
-  test_optional<std::optional>(connection);
-  #elif defined PQXX_HAVE_EXP_OPTIONAL && !defined(PQXX_HIDE_EXP_OPTIONAL)
+  test_optional<std::optional>(conn);
+#elif defined PQXX_HAVE_EXP_OPTIONAL && !defined(PQXX_HIDE_EXP_OPTIONAL)
   std::cout << "testing `std::experimental::optional` as optional...\n";
-  test_optional<std::experimental::optional>(connection);
-  #endif
+  test_optional<std::experimental::optional>(conn);
+#endif
 }
 
 
+PQXX_REGISTER_TEST(test_stream_to);
 } // namespace
-
-
-PQXX_REGISTER_TEST_T(test_stream_to, pqxx::nontransaction)

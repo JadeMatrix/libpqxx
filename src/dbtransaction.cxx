@@ -2,7 +2,7 @@
  *
  * pqxx::dbtransaction represents a real backend transaction.
  *
- * Copyright (c) 2004-2017, Jeroen T. Vermeulen.
+ * Copyright (c) 2004-2018, Jeroen T. Vermeulen.
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -21,11 +21,11 @@ namespace
 {
 std::string generate_set_transaction(
 	pqxx::readwrite_policy rw,
-	const std::string &IsolationString=std::string())
+	const std::string &IsolationString=std::string{})
 {
   std::string args;
 
-  if (!IsolationString.empty())
+  if (not IsolationString.empty())
     if (IsolationString != pqxx::isolation_traits<pqxx::read_committed>::name())
       args += " ISOLATION LEVEL " + IsolationString;
 
@@ -35,7 +35,7 @@ std::string generate_set_transaction(
 	pqxx::internal::sql_begin_work
 	:
 	(
-          std::string(pqxx::internal::sql_begin_work) +
+          std::string{pqxx::internal::sql_begin_work} +
           "; SET TRANSACTION" +
           args
 	);
@@ -47,9 +47,9 @@ pqxx::dbtransaction::dbtransaction(
 	connection_base &C,
 	const std::string &IsolationString,
 	readwrite_policy rw) :
-  namedclass("dbtransaction"),
-  transaction_base(C),
-  m_start_cmd(generate_set_transaction(rw, IsolationString))
+  namedclass{"dbtransaction"},
+  transaction_base{C},
+  m_start_cmd{generate_set_transaction(rw, IsolationString)}
 {
 }
 
@@ -58,9 +58,9 @@ pqxx::dbtransaction::dbtransaction(
 	connection_base &C,
 	bool direct,
 	readwrite_policy rw) :
-  namedclass("dbtransaction"),
+  namedclass{"dbtransaction"},
   transaction_base(C, direct),
-  m_start_cmd(generate_set_transaction(rw))
+  m_start_cmd{generate_set_transaction(rw)}
 {
 }
 

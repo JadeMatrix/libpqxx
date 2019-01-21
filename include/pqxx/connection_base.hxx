@@ -4,7 +4,7 @@
  *
  * DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/connection_base instead.
  *
- * Copyright (c) 2001-2018, Jeroen T. Vermeulen.
+ * Copyright (c) 2001-2019, Jeroen T. Vermeulen.
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -152,6 +152,11 @@ public:
  /**
    * @name Activation
    *
+   * @warning Connection deactivation/reactivation will probably be removed in
+   * libpqxx 7.  If your application relies on an ability to "put connections
+   * to sleep" and reactivate them later, you'll need to wrap them in some way
+   * to handle this.
+   *
    * Connections can be temporarily deactivated, or they can break because of
    * overly impatient firewalls dropping TCP connections.  Where possible,
    * libpqxx will try to re-activate these when resume using them, or you can
@@ -159,7 +164,7 @@ public:
    * should be aware of it.
    */
   //@{
-  /// Explicitly activate deferred or deactivated connection.
+  /// @deprecated Explicitly activate deferred or deactivated connection.
   /** Use of this method is entirely optional.  Whenever a connection is used
    * while in a deferred or deactivated state, it will transparently try to
    * bring itself into an activated state.  This function is best viewed as an
@@ -170,9 +175,9 @@ public:
    * deactivate().  A good time to call activate() might be just before you
    * first open a transaction on a lazy connection.
    */
-  void activate();							//[t12]
+  PQXX_DEPRECATED void activate();					//[t12]
 
-  /// Explicitly deactivate connection.
+  /// @deprecated Explicitly deactivate connection.
   /** Like its counterpart activate(), this method is entirely optional.
    * Calling this function really only makes sense if you won't be using this
    * connection for a while and want to reduce the number of open connections on
@@ -181,9 +186,9 @@ public:
    * calls to activate(), but calling deactivate() during a transaction is an
    * error.
    */
-  void deactivate();							//[t12]
+  PQXX_DEPRECATED void deactivate();					//[t12]
 
-  /// Disallow (or permit) connection recovery
+  /// @deprecated Disallow (or permit) connection recovery
   /** A connection whose underlying socket is not currently connected to the
    * server will normally (re-)establish communication with the server whenever
    * needed, or when the client program requests it (although for reasons of
@@ -228,7 +233,7 @@ public:
    * connection first.  This will ensure that definite activation happens before
    * you inhibit it.
    */
-  void inhibit_reactivation(bool inhibit)				//[t86]
+  PQXX_DEPRECATED void inhibit_reactivation(bool inhibit)		//[t86]
 	{ m_inhibit_reactivation=inhibit; }
 
   /// Make the connection fail.  @warning Do not use this except for testing!
@@ -377,15 +382,46 @@ public:
   int PQXX_PURE server_version() const noexcept;			//[t01]
   //@}
 
-  /// Set client-side character encoding
-  /** Search the PostgreSQL documentation for "multibyte" or "character set
-   * encodings" to find out more about the available encodings, how to extend
-   * them, and how to use them.  Not all server-side encodings are compatible
-   * with all client-side encodings or vice versa.
-   * @param Encoding Name of the character set encoding to use
+  /// @name Text encoding
+  /**
+   * Each connection is governed by a "client encoding," which dictates how
+   * strings and other text is represented in bytes.  The database server will
+   * send text data to you in this encoding, and you should use it for the
+   * queries and data which you send to the server.
+   *
+   * Search the PostgreSQL documentation for "character set encodings" to find
+   * out more about the available encodings, how to extend them, and how to use
+   * them.  Not all server-side encodings are compatible with all client-side
+   * encodings or vice versa.
+   *
+   * Encoding names are case-insensitive, so e.g. "UTF8" is equivalent to
+   * "utf8".
+   *
+   * You can change the client encoding, but this may not work when the
+   * connection is in a special state, such as when streaming a table.  It's
+   * not clear what happens if you change the encoding during a transaction,
+   * and then abort the transaction.
    */
-  void set_client_encoding(const std::string &Encoding)			//[t07]
-	{ set_variable("CLIENT_ENCODING", Encoding); }
+  //@{
+  /// Get client-side character encoding, by name.
+  std::string get_client_encoding() const;
+
+  /// Set client-side character encoding, by name.
+  /**
+   * @param Encoding Name of the character set encoding to use.
+   */
+  void set_client_encoding(const std::string &encoding);		//[t07]
+
+  /// Set client-side character encoding, by name.
+  /**
+   * @param Encoding Name of the character set encoding to use.
+   */
+  void set_client_encoding(const char encoding[]);			//[t07]
+
+  /// Get the connection's encoding, as a PostgreSQL-defined code.
+  int PQXX_PRIVATE encoding_id() const;
+
+  //@}
 
   /// Set session variable
   /** Set a session variable for this connection, using the SET command.  If the
@@ -499,9 +535,9 @@ public:
    * void foo(connection_base &C)
    * {
    *   C.prepare("findtable", "select * from pg_tables where name=$1");
-   *   work W(C);
+   *   work W{C};
    *   result R = W.exec_prepared("findtable", "mytable");
-   *   if (R.empty()) throw runtime_error("mytable not found!");
+   *   if (R.empty()) throw runtime_error{"mytable not found!"};
    * }
    * @endcode
    *
@@ -572,7 +608,12 @@ public:
    * @param T The transactor to be executed.
    */
   template<typename TRANSACTOR>
-  PQXX_DEPRECATED void perform(const TRANSACTOR &T) { perform(T, 3); }
+  PQXX_DEPRECATED void perform(const TRANSACTOR &T)
+  {
+#include "pqxx/internal/ignore-deprecated-pre.hxx"
+    perform(T, 3);
+#include "pqxx/internal/ignore-deprecated-post.hxx"
+  }
 
   /// Suffix unique number to name to make it unique within session context
   /** Used internally to generate identifiers for SQL objects (such as cursors
@@ -669,7 +710,7 @@ public:
 
 protected:
   explicit connection_base(connectionpolicy &pol) :
-	m_policy(pol)
+	m_policy{pol}
   {
     // Check library version.  The check_library_version template is declared
     // for any library version, but only actually defined for the version of
@@ -729,8 +770,8 @@ private:
   prepare::internal::prepared_def &register_prepared(const std::string &);
 
   friend class internal::gate::connection_prepare_invocation;
-  /// @deprecated To be replaced by exec_prepared.
-  result prepared_exec(
+  /// @deprecated Use exec_prepared instead.
+  PQXX_DEPRECATED result prepared_exec(
 	const std::string &,
 	const char *const[],
 	const int[],
@@ -810,7 +851,6 @@ private:
   void PQXX_PRIVATE start_exec(const std::string &);
   bool PQXX_PRIVATE consume_input() noexcept;
   bool PQXX_PRIVATE is_busy() const noexcept;
-  int PQXX_PRIVATE encoding_code();
   internal::pq::PGresult *get_result();
 
   friend class internal::gate::connection_dbtransaction;
@@ -821,8 +861,8 @@ private:
   friend class internal::gate::connection_reactivation_avoidance_exemption;
 
   friend class internal::gate::connection_parameterized_invocation;
-  /// @deprecated To be replaced with exec_params.
-  result parameterized_exec(
+  /// @deprecated Use exec_params instead.
+  PQXX_DEPRECATED result parameterized_exec(
 	const std::string &query,
 	const char *const params[],
 	const int paramlengths[],

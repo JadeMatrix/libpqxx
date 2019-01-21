@@ -16,12 +16,14 @@ void TestPipeline(pipeline &P, int numqueries)
 
   for (int i=numqueries; i; --i) P.insert(Q);
 
-  PQXX_CHECK(!numqueries || !P.empty(), "pipeline::empty() is broken.");
+  PQXX_CHECK(
+	(numqueries == 0) or not P.empty(),
+	"pipeline::empty() is broken.");
 
   int res = 0;
   for (int i=numqueries; i; --i)
   {
-    PQXX_CHECK(!P.empty(), "Got wrong number of queries from pipeline.");
+    PQXX_CHECK(not P.empty(), "Got wrong number of queries from pipeline.");
 
     pair<pipeline::query_id, result> R = P.retrieve();
 
@@ -39,12 +41,15 @@ void TestPipeline(pipeline &P, int numqueries)
 }
 
 
-void test_069(transaction_base &W)
+void test_069()
 {
-  pipeline P(W);
+  asyncconnection conn;
+  work tx{conn};
+  pipeline P(tx);
   PQXX_CHECK(P.empty(), "Pipeline is not empty initially.");
   for (int i=0; i<5; ++i) TestPipeline(P, i);
 }
-} // namespace
 
-PQXX_REGISTER_TEST_C(test_069, asyncconnection)
+
+PQXX_REGISTER_TEST(test_069);
+} // namespace

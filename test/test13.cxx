@@ -1,3 +1,5 @@
+#include <functional>
+
 #include "test_helpers.hxx"
 
 using namespace std;
@@ -20,26 +22,23 @@ const unsigned int BoringYear = 1977;
 
 // Count events and specifically events occurring in Boring Year, leaving the
 // former count in the result pair's first member, and the latter in second.
-class CountEvents : public transactor<>
+pair<int, int> count_events(connection_base &conn, string table)
 {
-  string m_table;
-  pair<int, int> &m_results;
-public:
-  CountEvents(string Table, pair<int,int> &Results) :
-    transactor<>("CountEvents"), m_table(Table), m_results(Results) {}
+  int all_years, boring_year;
 
-  void operator()(argument_type &T)
-  {
-    const string CountQuery = "SELECT count(*) FROM " + m_table;
-    row R;
+  const string CountQuery = "SELECT count(*) FROM " + table;
 
-    R = T.exec1(CountQuery);
-    R.front().to(m_results.first);
+  work tx{conn};
+  row R;
 
-    R = T.exec1(CountQuery + " WHERE year=" + to_string(BoringYear));
-    R.front().to(m_results.second);
-  }
-};
+  R = tx.exec1(CountQuery);
+  R.front().to(all_years);
+
+  R = tx.exec1(CountQuery + " WHERE year=" + to_string(BoringYear));
+  R.front().to(boring_year);
+
+  return std::make_pair(all_years, boring_year);
+}
 
 
 struct deliberate_error : exception
@@ -47,64 +46,43 @@ struct deliberate_error : exception
 };
 
 
-class FailedInsert : public transactor<>
+void failed_insert(connection_base &C, string table)
 {
-  string m_table;
-public:
-  explicit FailedInsert(string Table) :
-    transactor<>("FailedInsert"),
-    m_table(Table)
-  {
-  }
-
-  void operator()(argument_type &T)
-  {
-    result R = T.exec0(
-	"INSERT INTO " + m_table + " VALUES (" +
+  work tx(C);
+  result R = tx.exec0(
+	"INSERT INTO " + table + " VALUES (" +
 	to_string(BoringYear) + ", "
 	"'yawn')");
 
-    PQXX_CHECK_EQUAL(R.affected_rows(), 1u, "Bad affected_rows().");
-
-    throw deliberate_error();
-  }
-
-  void on_abort(const char Reason[]) noexcept
-  {
-    pqxx::test::expected_exception(name() + " failed: " + Reason);
-  }
-};
+  PQXX_CHECK_EQUAL(R.affected_rows(), 1u, "Bad affected_rows().");
+  throw deliberate_error();
+}
 
 
-void test_013(transaction_base &T)
+void test_013()
 {
-  connection_base &C(T.conn());
-  T.abort();
-
+  connection conn;
   {
-    work T2(C);
-    test::create_pqxxevents(T2);
-    T2.commit();
+    work tx{conn};
+    test::create_pqxxevents(tx);
+    tx.commit();
   }
 
   const string Table = "pqxxevents";
 
-  pair<int,int> Before;
-  C.perform(CountEvents(Table, Before));
+  const pair<int,int> Before = perform(bind(count_events, ref(conn), Table));
   PQXX_CHECK_EQUAL(
 	Before.second,
 	0,
 	"Already have event for " + to_string(BoringYear) + "--can't test.");
 
-  const FailedInsert DoomedTransaction(Table);
-  quiet_errorhandler d(C);
+  quiet_errorhandler d(conn);
   PQXX_CHECK_THROWS(
-	C.perform(DoomedTransaction),
+	perform(bind(failed_insert,  ref(conn), Table)),
 	deliberate_error,
 	"Failing transactor failed to throw correct exception.");
 
-  pair<int,int> After;
-  C.perform(CountEvents(Table, After));
+  const pair<int,int> After = perform(bind(count_events, ref(conn), Table));
 
   PQXX_CHECK_EQUAL(
 	After.first,
@@ -117,6 +95,6 @@ void test_013(transaction_base &T)
 	"abort() didn't reset event count for " + to_string(BoringYear));
 }
 
-} // namespace
 
-PQXX_REGISTER_TEST_T(test_013, nontransaction)
+PQXX_REGISTER_TEST(test_013);
+} // namespace

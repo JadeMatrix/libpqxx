@@ -43,7 +43,7 @@ pair<int,int> CountEvents(transaction_base &T)
 
 // Try adding a record, then aborting it, and check whether the abort was
 // performed correctly.
-void Test(connection_base &C, bool ExplicitAbort)
+void Test(connection_base &conn, bool ExplicitAbort)
 {
   vector<string> BoringRow = {to_string(BoringYear), "yawn"};
 
@@ -54,7 +54,7 @@ void Test(connection_base &C, bool ExplicitAbort)
   {
     // Begin a transaction acting on our current connection; we'll abort it
     // later though.
-    work Doomed(C, "Doomed");
+    work Doomed(conn, "Doomed");
 
     // Verify that our Boring Year was not yet in the events table
     EventCounts = CountEvents(Doomed);
@@ -65,17 +65,9 @@ void Test(connection_base &C, bool ExplicitAbort)
 	"Can't run; " + to_string(BoringYear) + " is already in the table.");
 
     // Now let's try to introduce a row for our Boring Year
-    {
-      tablewriter W(Doomed, Table);
-
-      PQXX_CHECK_EQUAL(W.name(), Table, "tablewriter name is not what I set.");
-
-      const string Literal = W.generate(BoringRow);
-      const string Expected = to_string(BoringYear) + "\t" + BoringRow[1];
-      PQXX_CHECK_EQUAL(Literal, Expected, "tablewriter mangles new row.");
-
-      W.push_back(BoringRow);
-    }
+    Doomed.exec0(
+	"INSERT INTO " + Table + "(year, event) "
+        "VALUES (" + to_string(BoringYear) + ", 'yawn')");
 
     auto Recount = CountEvents(Doomed);
     PQXX_CHECK_EQUAL(Recount.second, 1, "Unexpected number of events.");
@@ -94,7 +86,7 @@ void Test(connection_base &C, bool ExplicitAbort)
   // Now check that we're back in the original state.  Note that this may go
   // wrong if somebody managed to change the table between our two
   // transactions.
-  work Checkup(C, "Checkup");
+  work Checkup(conn, "Checkup");
 
   auto NewEvents = CountEvents(Checkup);
   PQXX_CHECK_EQUAL(
@@ -106,18 +98,19 @@ void Test(connection_base &C, bool ExplicitAbort)
 }
 
 
-void test_029(transaction_base &)
+void test_029()
 {
-  lazyconnection C;
+  lazyconnection conn;
   {
-    nontransaction T(C);
-    test::create_pqxxevents(T);
+    nontransaction tx{conn};
+    test::create_pqxxevents(tx);
   }
 
   // Test abort semantics, both with explicit and implicit abort
-  Test(C, true);
-  Test(C, false);
+  Test(conn, true);
+  Test(conn, false);
 }
-} // namespace
 
-PQXX_REGISTER_TEST_NODB(test_029)
+
+PQXX_REGISTER_TEST(test_029);
+} // namespace

@@ -20,26 +20,29 @@ void InitVector(VEC &V, typename VEC::size_type s, VAL val)
 }
 
 
-void test_067(transaction_base &orgT)
+void test_067()
 {
-  connection_base &C(orgT.conn());
-  orgT.abort();
+  asyncconnection conn;
 
   const string Table = "pg_tables";
 
-  // Tell C we won't be needing it for a while (not true, but let's pretend)
-  C.deactivate();
+#include <pqxx/internal/ignore-deprecated-pre.hxx>
+  // Tell conn we won't be needing it for a while (not true, but let's pretend).
+  conn.deactivate();
+#include <pqxx/internal/ignore-deprecated-post.hxx>
 
   // Now set up some data structures
   vector<int> NullFields;		// Maps column to no. of null fields
   vector<bool> SortedUp, SortedDown;	// Does column appear to be sorted?
 
-  // ...And reactivate C (not really needed, but it sounds more polite)
-  C.activate();
+#include <pqxx/internal/ignore-deprecated-pre.hxx>
+  // ...And reactivate conn (not really needed, but it sounds more polite).
+  conn.activate();
+#include <pqxx/internal/ignore-deprecated-post.hxx>
 
-  work T(C, "test67");
+  work tx{conn, "test67"};
 
-  result R( T.exec("SELECT * FROM " + Table) );
+  result R{ tx.exec("SELECT * FROM " + Table) };
 
   InitVector(NullFields, R.columns(), 0);
   InitVector(SortedUp, R.columns(), true);
@@ -62,7 +65,7 @@ void test_067(transaction_base &orgT)
       string A, B;
       PQXX_CHECK_EQUAL(
 	i[f].to(A),
-	i[f].to(B, string("")),
+	i[f].to(B, string{""}),
 	"Variants of to() disagree on nullness.");
 
       PQXX_CHECK_EQUAL(A, B, "to() variants return different values.");
@@ -83,11 +86,11 @@ void test_067(transaction_base &orgT)
       // simple strings.
       for (pqxx::row::size_type f = 0; f < R.columns(); ++f)
       {
-	if (!j[f].is_null() && !i[f].is_null())
+	if (not j[f].is_null() and not i[f].is_null())
 	{
 	  const bool U = SortedUp[f], D = SortedDown[f];
-	  SortedUp[f] = (U && (j[f].as<string>() <= i[f].as<string>()));
-	  SortedDown[f] = (D && (j[f].as<string>() >= i[f].as<string>()));
+	  SortedUp[f] = (U and (j[f].as<string>() <= i[f].as<string>()));
+	  SortedDown[f] = (D and (j[f].as<string>() >= i[f].as<string>()));
 	}
       }
     }
@@ -114,6 +117,7 @@ void test_067(transaction_base &orgT)
 	"Found impossible number of nulls.");
   }
 }
-} // namespace
 
-PQXX_REGISTER_TEST_CT(test_067, asyncconnection, nontransaction)
+
+PQXX_REGISTER_TEST(test_067);
+} // namespace

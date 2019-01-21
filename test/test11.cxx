@@ -11,11 +11,13 @@ using namespace pqxx;
 // Test program for libpqxx.  Query a table and report its metadata.
 namespace
 {
-void test_011(transaction_base &T)
+void test_011()
 {
+  connection conn;
+  work tx{conn};
   const string Table = "pg_tables";
 
-  result R( T.exec("SELECT * FROM " + Table) );
+  result R( tx.exec("SELECT * FROM " + Table) );
 
   // Print column names
   for (pqxx::row::size_type c = 0; c < R.columns(); ++c)
@@ -26,7 +28,7 @@ void test_011(transaction_base &T)
   }
 
   // If there are rows in R, compare their metadata to R's.
-  if (!R.empty())
+  if (not R.empty())
   {
     PQXX_CHECK_EQUAL(R[0].rownumber(), 0u, "Row 0 has wrong number.");
 
@@ -52,12 +54,12 @@ void test_011(transaction_base &T)
       string N = R.column_name(c);
 
       PQXX_CHECK_EQUAL(
-	string(R[0].at(c).c_str()),
+	string{R[0].at(c).c_str()},
 	R[0].at(N).c_str(),
 	"Field by name != field by number.");
 
       PQXX_CHECK_EQUAL(
-	string(R[0][c].c_str()),
+	string{R[0][c].c_str()},
 	R[0][N].c_str(),
 	"at() is inconsistent with operator[].");
 
@@ -74,6 +76,7 @@ void test_011(transaction_base &T)
     cout << "(Table is empty.)" << endl;
   }
 }
-} // namespace
 
-PQXX_REGISTER_TEST(test_011)
+
+PQXX_REGISTER_TEST(test_011);
+} // namespace

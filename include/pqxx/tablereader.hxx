@@ -32,7 +32,7 @@ public:
   PQXX_DEPRECATED tablereader(
 	transaction_base &,
 	const std::string &Name,
-	const std::string &Null=std::string());
+	const std::string &Null=std::string{});
   template<typename ITER>
   PQXX_DEPRECATED tablereader(
 	transaction_base &,
@@ -48,17 +48,17 @@ public:
 	const std::string &Null);
   ~tablereader() noexcept;
   template<typename TUPLE> tablereader &operator>>(TUPLE &);
-  operator bool() const noexcept { return !m_done; }
+  operator bool() const noexcept { return not m_done; }
   bool operator!() const noexcept { return m_done; }
   bool get_raw_line(std::string &Line);
   template<typename TUPLE>
   void tokenize(std::string, TUPLE &) const;
   virtual void complete() override;
 private:
-  void setup(
+  void set_up(
 	transaction_base &T,
 	const std::string &RName,
-	const std::string &Columns=std::string());
+	const std::string &Columns=std::string{});
   PQXX_PRIVATE void reader_close();
   std::string extract_field(
 	const std::string &,
@@ -73,11 +73,11 @@ tablereader::tablereader(
 	const std::string &Name,
 	ITER begincolumns,
 	ITER endcolumns) :
-  namedclass(Name, "tablereader"),
-  tablestream(T, std::string()),
-  m_done(true)
+  namedclass{Name, "tablereader"},
+  tablestream{T, std::string{}},
+  m_done{true}
 {
-  setup(T, Name, columnlist(begincolumns, endcolumns));
+  set_up(T, Name, columnlist(begincolumns, endcolumns));
 }
 
 
@@ -88,11 +88,11 @@ tablereader::tablereader(
 	ITER begincolumns,
 	ITER endcolumns,
 	const std::string &Null) :
-  namedclass(Name, "tablereader"),
-  tablestream(T, Null),
-  m_done(true)
+  namedclass{Name, "tablereader"},
+  tablestream{T, Null},
+  m_done{true}
 {
-  setup(T, Name, columnlist(begincolumns, endcolumns));
+  set_up(T, Name, columnlist(begincolumns, endcolumns));
 }
 
 
@@ -100,7 +100,7 @@ template<typename TUPLE>
 inline void tablereader::tokenize(std::string Line, TUPLE &T) const
 {
   std::back_insert_iterator<TUPLE> ins = std::back_inserter(T);
-  std::string::size_type here=0;
+  std::string::size_type here = 0;
   while (here < Line.size()) *ins++ = extract_field(Line, here);
 }
 

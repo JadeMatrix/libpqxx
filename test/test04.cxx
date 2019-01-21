@@ -21,8 +21,8 @@ class TestListener final : public notification_receiver
   bool m_done;
 
 public:
-  explicit TestListener(connection_base &C) :
-	notification_receiver(C, "listen"), m_done(false) {}
+  explicit TestListener(connection_base &conn) :
+	notification_receiver(conn, "listen"), m_done(false) {}
 
   virtual void operator()(const string &, int be_pid) override
   {
@@ -37,33 +37,23 @@ public:
 };
 
 
-// A transactor to trigger our notification receiver.
-class Notify : public transactor<>
+void test_004()
 {
-  string m_channel;
+  connection conn;
 
-public:
-  explicit Notify(string channel) :
-    transactor<>("Notifier"), m_channel(channel) { }
-
-  void operator()(argument_type &T)
-  {
-    T.exec("NOTIFY \"" + m_channel + "\"");
-    Backend_PID = T.conn().backendpid();
-  }
-};
-
-
-void test_004(transaction_base &T)
-{
-  T.abort();
-
-  TestListener L(T.conn());
-
-  T.conn().perform(Notify(L.channel()));
+  TestListener L{conn};
+  // Trigger our notification receiver.
+  perform(
+    [&conn, &L]()
+    {
+      work tx(conn);
+      tx.exec("NOTIFY " + conn.quote_name(L.channel()));
+      Backend_PID = conn.backendpid();
+      tx.commit();
+    });
 
   int notifs = 0;
-  for (int i=0; (i < 20) && !L.done(); ++i)
+  for (int i=0; (i < 20) and not L.done(); ++i)
   {
     PQXX_CHECK_EQUAL(notifs, 0, "Got unexpected notifications.");
 
@@ -71,13 +61,13 @@ void test_004(transaction_base &T)
     // this at home!  The pqxx::internal namespace is not for third-party use
     // and may change radically at any time.
     pqxx::internal::sleep_seconds(1);
-    notifs = T.conn().get_notifs();
+    notifs = conn.get_notifs();
   }
 
   PQXX_CHECK_NOT_EQUAL(L.done(), false, "No notification received.");
   PQXX_CHECK_EQUAL(notifs, 1, "Got too many notifications.");
 }
 
-} // namespace
 
-PQXX_REGISTER_TEST_T(test_004, nontransaction)
+PQXX_REGISTER_TEST(test_004);
+} // namespace

@@ -29,86 +29,24 @@ public:
 void drop_table(transaction_base &, const std::string &table);
 
 
-class base_test;
-using test_map = std::map<std::string, base_test *>;
-
-/// Register test (if given); return test_map.
-const test_map &register_test(base_test *);
+using testfunc = void (*)();
 
 
-/// Base class for test cases.
-class base_test
+void register_test(const char name[], testfunc func);
+
+
+/// Register a test while not inside a function.
+struct registrar
 {
-public:
-  using testfunc = void (*)(transaction_base &);
-
-  base_test(const std::string &tname, testfunc func);
-
-  /// Overridable: run test case.
-  virtual void run() =0;
-
-  virtual ~base_test() =0;
-  const std::string &name() const noexcept { return m_name; }
-private:
-  std::string m_name;
-protected:
-  testfunc m_func;
-};
-
-
-/// Runner class for libpqxx tests.  Sets up a connection and transaction.
-template<typename CONNECTION=connection, typename TRANSACTION=work>
-class test_case final : public base_test
-{
-public:
-  // func takes connection and transaction as arguments.
-  test_case(const std::string &tname, testfunc func) :
-    base_test(tname, func)
+  registrar(const char name[], testfunc func)
   {
-  }
-
-  ~test_case() {}
-
-  virtual void run() override
-  {
-    CONNECTION c;
-    TRANSACTION t(c, name());
-    m_func(t);
+    pqxx::test::register_test(name, func);
   }
 };
 
 
-// Register a function taking (connection_base &, transaction_base &) as a test.
-#define PQXX_REGISTER_TEST(function) \
-	namespace \
-	{ \
-	pqxx::test::test_case<> test(#function, function); \
-	}
-
-// Register a test function using given connection and transaction types.
-#define PQXX_REGISTER_TEST_CT(function, connection_type, transaction_type) \
-	namespace \
-	{ \
-	pqxx::test::test_case< connection_type, transaction_type > \
-		test(#function, function); \
-	}
-
-// Register a test function using a given connection type (instead of the
-// default "connection").
-#define PQXX_REGISTER_TEST_C(function, connection_type) \
-	PQXX_REGISTER_TEST_CT(function, connection_type, pqxx::work)
-
-// Register a test function using a given transaction type (default is "work").
-#define PQXX_REGISTER_TEST_T(function, transaction_type) \
-	PQXX_REGISTER_TEST_CT(function, pqxx::connection, transaction_type)
-
-
-// Register test function that takes a nullconnection and nontransaction.
-#define PQXX_REGISTER_TEST_NODB(function) \
-	PQXX_REGISTER_TEST_CT( \
-		function, \
-		pqxx::nullconnection, \
-		pqxx::nontransaction)
+// Register a test function, so the runner will run it.
+#define PQXX_REGISTER_TEST(func) pqxx::test::registrar tst_##func{#func, func}
 
 
 // Unconditional test failure.
@@ -237,13 +175,13 @@ inline void end_of_statement()
 	  catch (const pqxx::test::failure_to_fail &) \
 	  { \
 	    PQXX_CHECK_NOTREACHED( \
-		std::string(desc) + " (\"" #action "\" did not throw)"); \
+		std::string{desc} + " (\"" #action "\" did not throw)"); \
 	  } \
 	  catch (const std::exception &) {} \
           catch (...) \
           { \
             PQXX_CHECK_NOTREACHED( \
-		std::string(desc) + \
+		std::string{desc} + \
 		" (\"" #action "\" threw non-exception type)"); \
           } \
 	} \
@@ -260,14 +198,14 @@ inline void end_of_statement()
 	  catch (const pqxx::test::failure_to_fail &) \
 	  { \
 	    PQXX_CHECK_NOTREACHED( \
-		std::string(desc) + \
+		std::string{desc} + \
 		" (\"" #action "\" did not throw " #exception_type ")"); \
 	  } \
 	  catch (const exception_type &) {} \
 	  catch (const std::exception &e) \
 	  { \
 	    PQXX_CHECK_NOTREACHED( \
-		std::string(desc) + \
+		std::string{desc} + \
 		" (\"" #action "\" " \
 		"threw exception other than " #exception_type ": " + \
                 e.what() + ")"); \
@@ -275,7 +213,7 @@ inline void end_of_statement()
           catch (...) \
           { \
             PQXX_CHECK_NOTREACHED( \
-		std::string(desc) + \
+		std::string{desc} + \
 		" (\"" #action "\" threw non-exception type)"); \
           } \
 	} \
@@ -305,9 +243,9 @@ inline void check_bounds(
 	const std::string &desc)
 {
   const std::string
-	range_check = std::string(lower_text) + " < " + upper_text,
-	lower_check = std::string("!(") + text + " < " + lower_text + ")",
-	upper_check = std::string(text) + " < " + upper_text;
+	range_check = std::string{lower_text} + " < " + upper_text,
+	lower_check = std::string{"!("} + text + " < " + lower_text + ")",
+	upper_check = std::string{text} + " < " + upper_text;
 
   pqxx::test::check(
 	file,
@@ -318,7 +256,7 @@ inline void check_bounds(
   pqxx::test::check(
 	file,
 	line,
-	!(value < lower),
+	not (value < lower),
 	lower_check.c_str(),
 	desc + " (" + text + " is below lower bound " + lower_text + ")");
   pqxx::test::check(

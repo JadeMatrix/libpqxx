@@ -23,7 +23,7 @@ void test_check_notreached()
   {
     // This is what we expect.
   }
-  if (!failed)
+  if (not failed)
     throw test_failure(__FILE__, __LINE__, "PQXX_CHECK_NOTREACHED is broken.");
 }
 
@@ -42,7 +42,7 @@ void test_check()
   catch (const test_failure &)
   {
   }
-  if (!failed) PQXX_CHECK_NOTREACHED("PQXX_CHECK failed to notice failure.");
+  if (not failed) PQXX_CHECK_NOTREACHED("PQXX_CHECK failed to notice failure.");
 }
 
 
@@ -156,7 +156,7 @@ void test_check_throws()
 }
 
 
-void test_test_helpers(transaction_base &)
+void test_test_helpers()
 {
   test_check_notreached();
   test_check();
@@ -224,7 +224,7 @@ void test_test_helpers(transaction_base &)
 	test_failure,
 	"PQXX_CHECK_BOUNDS did not detect empty interval.");
 }
+
+
+PQXX_REGISTER_TEST(test_test_helpers);
 } // namespace
-
-
-PQXX_REGISTER_TEST_NODB(test_test_helpers)

@@ -11,28 +11,33 @@ using namespace pqxx;
 // Example program for libpqxx.  Test binarystring functionality.
 namespace
 {
-void test_062(transaction_base &T)
+void test_062()
 {
+  connection conn;
+  work tx{conn};
+
   const string TestStr =
 	"Nasty\n\030Test\n\t String with \200\277 weird bytes "
 	"\r\0 and Trailer\\\\\0";
 
-  T.exec0("CREATE TEMP TABLE pqxxbin (binfield bytea)");
+  tx.exec0("CREATE TEMP TABLE pqxxbin (binfield bytea)");
 
-  const string Esc = T.esc_raw(TestStr),
-	Chk = T.esc_raw(reinterpret_cast<const unsigned char *>(TestStr.c_str()),
-                      strlen(TestStr.c_str()));
+  const string
+	Esc = tx.esc_raw(TestStr),
+	Chk = tx.esc_raw(
+		reinterpret_cast<const unsigned char *>(TestStr.c_str()),
+                strlen(TestStr.c_str()));
 
   PQXX_CHECK_EQUAL(Chk, Esc, "Inconsistent results from esc_raw().");
 
-  T.exec0("INSERT INTO pqxxbin VALUES ('" + Esc + "')");
+  tx.exec0("INSERT INTO pqxxbin VALUES ('" + Esc + "')");
 
-  result R = T.exec("SELECT * from pqxxbin");
-  T.exec0("DELETE FROM pqxxbin");
+  result R = tx.exec("SELECT * from pqxxbin");
+  tx.exec0("DELETE FROM pqxxbin");
 
   binarystring B( R.at(0).at(0) );
 
-  PQXX_CHECK(!B.empty(), "Binary string became empty in conversion.");
+  PQXX_CHECK(not B.empty(), "Binary string became empty in conversion.");
 
   PQXX_CHECK_EQUAL(B.size(), TestStr.size(), "Binary string was mangled.");
 
@@ -80,15 +85,15 @@ void test_062(transaction_base &T)
   PQXX_CHECK_EQUAL(B.str(), TestStr, "Binary string was mangled.");
 
   const string TestStr2("(More conventional text)");
-  T.exec0("INSERT INTO pqxxbin VALUES ('" + TestStr2 + "')");
-  R = T.exec("SELECT * FROM pqxxbin");
+  tx.exec0("INSERT INTO pqxxbin VALUES ('" + TestStr2 + "')");
+  R = tx.exec("SELECT * FROM pqxxbin");
   binarystring B2(R.front().front());
 
-  PQXX_CHECK(!(B2 == B), "False positive on binarystring::operator==().");
+  PQXX_CHECK(not (B2 == B), "False positive on binarystring::operator==().");
   PQXX_CHECK(B2 != B, "False negative on binarystring::operator!=().");
 
   binarystring B1c(B), B2c(B2);
-  PQXX_CHECK(!(B1c != B), "Copied binarystring differs from original.");
+  PQXX_CHECK(not (B1c != B), "Copied binarystring differs from original.");
   PQXX_CHECK(B2c == B2, "Copied binarystring not equal to original.");
 
   B1c.swap(B2c);
@@ -97,6 +102,7 @@ void test_062(transaction_base &T)
   PQXX_CHECK(B2c == B, "binarystring::swap() is broken.");
   PQXX_CHECK(B1c == B2, "Cross-check of swapped binarystrings failed.");
 }
-} // namespace
 
-PQXX_REGISTER_TEST(test_062)
+
+PQXX_REGISTER_TEST(test_062);
+} // namespace

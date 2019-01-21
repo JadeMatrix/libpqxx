@@ -12,96 +12,45 @@ namespace
 const string Contents = "Large object test contents";
 
 
-class CreateLargeObject : public transactor<>
+void test_052()
 {
-public:
-  explicit CreateLargeObject(largeobject &O) :
-    transactor<>("CreateLargeObject"),
-    m_object(),
-    m_object_output(O)
-  {
-  }
+  connection conn;
 
-  void operator()(argument_type &T)
-  {
-    m_object = largeobject(T);
-    cout << "Created large object #" << m_object.id() << endl;
-  }
+  largeobject Obj = perform(
+    [&conn]()
+    {
+      work tx{conn};
+      auto obj = largeobject{tx};
+      tx.commit();
+      return obj;
+    });
 
-  void on_commit()
-  {
-    m_object_output = m_object;
-  }
+  perform(
+    [&conn, &Obj]()
+    {
+      work tx{conn};
+      largeobjectaccess A{tx, Obj.id(), ios::out};
+      A.write(Contents);
+      tx.commit();
+    });
 
-private:
-  largeobject m_object;
-  largeobject &m_object_output;
-};
+  perform(
+    [&conn, &Obj]()
+    {
+      work tx{conn};
+      Obj.to_file(tx, "pqxxlo.txt");
+      tx.commit();
+    });
 
-
-class WriteLargeObject : public transactor<>
-{
-public:
-  explicit WriteLargeObject(largeobject &O) :
-    transactor<>("WriteLargeObject"),
-    m_object(O)
-  {
-  }
-
-  void operator()(argument_type &T)
-  {
-    largeobjectaccess A(T, m_object.id(), ios::out);
-    cout << "Writing to large object #" << largeobject(A).id() << endl;
-    A.write(Contents);
-  }
-
-private:
-  largeobject m_object;
-};
-
-
-class CopyLargeObject : public transactor<>
-{
-public:
-  explicit CopyLargeObject(largeobject O) : m_object(O) {}
-
-  void operator()(argument_type &T)
-  {
-    m_object.to_file(T, "pqxxlo.txt");
-  }
-
-private:
-  largeobject m_object;
-};
-
-
-class DeleteLargeObject : public transactor<>
-{
-public:
-  explicit DeleteLargeObject(largeobject O) : m_object(O) {}
-
-  void operator()(argument_type &T)
-  {
-    m_object.remove(T);
-  }
-
-private:
-  largeobject m_object;
-};
-
-
-void test_052(transaction_base &orgT)
-{
-  connection_base &C(orgT.conn());
-  orgT.abort();
-
-  largeobject Obj;
-
-  C.perform(CreateLargeObject(Obj));
-  C.perform(WriteLargeObject(Obj));
-  C.perform(CopyLargeObject(Obj));
-  C.perform(DeleteLargeObject(Obj));
+  perform(
+    [&conn, &Obj]()
+    {
+      work tx{conn};
+      Obj.remove(tx);
+      tx.commit();
+    });
 }
-} // namespace
 
-PQXX_REGISTER_TEST_T(test_052, nontransaction)
+
+PQXX_REGISTER_TEST(test_052);
+} // namespace

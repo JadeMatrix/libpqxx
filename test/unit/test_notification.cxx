@@ -48,7 +48,10 @@ void test_receive(
   t.commit();
 
   int notifs = 0;
-  for (int i=0; (i < 10) && !notifs; ++i, pqxx::internal::sleep_seconds(1))
+  for (
+	int i=0;
+	(i < 10) and (notifs == 0);
+	++i, pqxx::internal::sleep_seconds(1))
     notifs = conn.get_notifs();
 
   PQXX_CHECK_EQUAL(notifs, 1, "Got wrong number of notifications.");
@@ -58,17 +61,19 @@ void test_receive(
 }
 
 
-void test_notification(transaction_base &t)
+void test_notification()
 {
-  connection_base &conn(t.conn());
+  connection conn;
   TestReceiver receiver(conn, "mychannel");
   PQXX_CHECK_EQUAL(receiver.channel(), "mychannel", "Bad channel.");
 
-  test_receive(t, "channel1");
+  work tx{conn};
+  test_receive(tx, "channel1");
 
   nontransaction u(conn);
   test_receive(u, "channel2", "payload");
 }
-} // namespace
 
-PQXX_REGISTER_TEST_T(test_notification, nontransaction)
+
+PQXX_REGISTER_TEST(test_notification);
+} // namespace

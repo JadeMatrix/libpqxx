@@ -1,3 +1,5 @@
+#include <functional>
+
 #include "test_helpers.hxx"
 
 using namespace std;
@@ -14,33 +16,23 @@ namespace
 // Let's take a boring year that is not going to be in the "pqxxevents" table
 const int BoringYear = 1977;
 
-
 // Count events and specifically events occurring in Boring Year, leaving the
 // former count in the result pair's first member, and the latter in second.
-class CountEvents : public transactor<nontransaction>
+pair<int, int> count_events(connection_base &conn, string table)
 {
-  string m_table;
-  pair<int, int> &m_results;
-public:
-  CountEvents(string Table, pair<int,int> &Results) :
-    transactor<nontransaction>("CountEvents"),
-    m_table(Table),
-    m_results(Results)
-  {
-  }
+  const string CountQuery = "SELECT count(*) FROM " + table;
+  row R;
+  int all_years, boring_year;
 
-  void operator()(argument_type &T)
-  {
-    const string CountQuery = "SELECT count(*) FROM " + m_table;
-    row R;
+  nontransaction tx{conn};
+  R = tx.exec1(CountQuery.c_str());
+  R.front().to(all_years);
 
-    R = T.exec1(CountQuery.c_str());
-    R.front().to(m_results.first);
+  R = tx.exec1(CountQuery + " WHERE year=" + to_string(BoringYear));
+  R.front().to(boring_year);
 
-    R = T.exec1(CountQuery + " WHERE year=" + to_string(BoringYear));
-    R.front().to(m_results.second);
-  }
-};
+  return make_pair(all_years, boring_year);
+}
 
 
 struct deliberate_error : exception
@@ -48,71 +40,40 @@ struct deliberate_error : exception
 };
 
 
-class FailedInsert : public transactor<robusttransaction<>>
+void test_037()
 {
-  string m_table;
-  static string LastReason;
-public:
-  explicit FailedInsert(string Table) :
-    transactor<argument_type>("FailedInsert037"),
-    m_table(Table)
+  lazyconnection conn;
   {
-  }
-
-  void operator()(argument_type &T)
-  {
-    T.exec0(
-	"INSERT INTO " + m_table + " VALUES (" +
-	to_string(BoringYear) + ", "
-	"'yawn')");
-
-    throw deliberate_error();
-  }
-
-  void on_abort(const char Reason[]) noexcept
-  {
-    if (Reason != LastReason)
-    {
-      pqxx::test::expected_exception(
-	"Transactor " + name() + " failed: " + Reason);
-      LastReason = Reason;
-    }
-  }
-};
-
-
-string FailedInsert::LastReason;
-
-
-void test_037(transaction_base &)
-{
-  lazyconnection C;
-  {
-    nontransaction T(C);
-    test::create_pqxxevents(T);
+    nontransaction tx{conn};
+    test::create_pqxxevents(tx);
   }
 
   const string Table = "pqxxevents";
 
-  pair<int,int> Before;
-  C.perform(CountEvents(Table, Before));
+  const pair<int,int> Before = perform(bind(count_events, ref(conn), Table));
   PQXX_CHECK_EQUAL(
 	Before.second,
 	0,
 	"Already have event for " + to_string(BoringYear) + ", cannot test.");
 
-  const FailedInsert DoomedTransaction(Table);
-
   {
-    quiet_errorhandler d(C);
+    quiet_errorhandler d(conn);
     PQXX_CHECK_THROWS(
-	C.perform(DoomedTransaction),
+	perform(
+          [&conn, &Table](){ 
+                robusttransaction<> tx{conn};
+    		tx.exec0(
+			"INSERT INTO " + Table + " VALUES (" +
+			to_string(BoringYear) + ", "
+			"'yawn')");
+
+    		throw deliberate_error();
+	  }),
 	deliberate_error,
 	"Did not get expected exception from failing transactor.");
   }
 
-  pair<int,int> After;
-  C.perform(CountEvents(Table, After));
+  const pair<int,int> After = perform(bind(count_events, ref(conn), Table));
 
   PQXX_CHECK_EQUAL(After.first, Before.first, "Number of events changed.");
   PQXX_CHECK_EQUAL(
@@ -120,6 +81,7 @@ void test_037(transaction_base &)
 	Before.second,
 	"Number of events for " + to_string(BoringYear) + " changed.");
 }
-} // namespace
 
-PQXX_REGISTER_TEST_NODB(test_037)
+
+PQXX_REGISTER_TEST(test_037);
+} // namespace

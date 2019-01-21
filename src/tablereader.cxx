@@ -2,7 +2,7 @@
  *
  * pqxx::tablereader enables optimized batch reads from a database table.
  *
- * Copyright (c) 2001-2017, Jeroen T. Vermeulen.
+ * Copyright (c) 2001-2018, Jeroen T. Vermeulen.
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -22,19 +22,19 @@ pqxx::tablereader::tablereader(
 	transaction_base &T,
 	const std::string &Name,
 	const std::string &Null) :
-  namedclass("tablereader", Name),
+  namedclass{"tablereader", Name},
   tablestream(T, Null),
-  m_done(true)
+  m_done{true}
 {
-  setup(T, Name);
+  set_up(T, Name);
 }
 
-void pqxx::tablereader::setup(
+void pqxx::tablereader::set_up(
 	transaction_base &T,
 	const std::string &Name,
 	const std::string &Columns)
 {
-  gate::transaction_tablereader(T).BeginCopyRead(Name, Columns);
+  gate::transaction_tablereader{T}.BeginCopyRead(Name, Columns);
   register_me();
   m_done = false;
 }
@@ -54,16 +54,16 @@ pqxx::tablereader::~tablereader() noexcept
 
 bool pqxx::tablereader::get_raw_line(std::string &Line)
 {
-  if (!m_done) try
+  if (not m_done) try
   {
-    m_done = !gate::transaction_tablereader(m_trans).read_copy_line(Line);
+    m_done = not gate::transaction_tablereader{m_trans}.read_copy_line(Line);
   }
   catch (const std::exception &)
   {
     m_done = true;
     throw;
   }
-  return !m_done;
+  return not m_done;
 }
 
 
@@ -75,12 +75,12 @@ void pqxx::tablereader::complete()
 
 void pqxx::tablereader::reader_close()
 {
-  if (!is_finished())
+  if (not is_finished())
   {
     base_close();
 
     // If any lines remain to be read, consume them to not confuse PQendcopy()
-    if (!m_done)
+    if (not m_done)
     {
       try
       {
@@ -105,7 +105,7 @@ namespace
 {
 inline bool is_octalchar(char o) noexcept
 {
-  return (o>='0') && (o<='7');
+  return (o>='0') and (o<='7');
 }
 
 /// Find first tab character at or after start position in string
@@ -144,13 +144,13 @@ std::string pqxx::tablereader::extract_field(
       {
         const char n = Line[++i];
         if (i >= Line.size())
-          throw failure("Row ends in backslash");
+          throw failure{"Row ends in backslash."};
 
 	switch (n)
 	{
 	case 'N':	// Null value
-	  if (!R.empty())
-	    throw failure("Null sequence found in nonempty field");
+	  if (not R.empty())
+	    throw failure{"Null sequence found in nonempty field."};
 	  R = NullStr();
 	  isnull = true;
 	  break;
@@ -165,11 +165,11 @@ std::string pqxx::tablereader::extract_field(
 	case '7':
           {
 	    if ((i+2) >= Line.size())
-	      throw failure("Row ends in middle of octal value");
+	      throw failure{"Row ends in middle of octal value."};
 	    const char n1 = Line[++i];
 	    const char n2 = Line[++i];
-	    if (!is_octalchar(n1) || !is_octalchar(n2))
-	      throw failure("Invalid octal in encoded table stream");
+	    if (not is_octalchar(n1) or not is_octalchar(n2))
+	      throw failure{"Invalid octal in encoded table stream."};
 	    R += char(
 		(digit_to_number(n)<<6) |
 		(digit_to_number(n1)<<3) |
@@ -205,7 +205,7 @@ std::string pqxx::tablereader::extract_field(
 	  if (i == stop)
 	  {
 	    if ((i+1) >= Line.size())
-	      throw internal_error("COPY line ends in backslash");
+	      throw internal_error{"COPY line ends in backslash."};
 	    stop = findtab(Line, i+1);
 	  }
 	  break;
@@ -220,8 +220,8 @@ std::string pqxx::tablereader::extract_field(
   }
   ++i;
 
-  if (isnull && (R.size() != NullStr().size()))
-    throw failure("Field contains data behind null sequence");
+  if (isnull and (R.size() != NullStr().size()))
+    throw failure{"Field contains data behind null sequence."};
 
   return R;
 }

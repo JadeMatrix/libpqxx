@@ -12,80 +12,37 @@ namespace
 {
 const string Contents = "Large object test contents";
 
-class ImportLargeObject : public transactor<>
+
+void test_053()
 {
-public:
-  explicit ImportLargeObject(largeobject &O, const string &File) :
-    transactor<>("ImportLargeObject"),
-    m_object(O),
-    m_file(File)
-  {
-  }
+  connection conn;
 
-  void operator()(argument_type &T)
-  {
-    m_object = largeobject(T, m_file);
-    cout << "Imported '" << m_file << "' "
-            "to large object #" << m_object.id() << endl;
-  }
+  largeobject Obj = perform(
+    [&conn]()
+    {
+      work tx{conn};
+      auto obj = largeobject{tx, "pqxxlo.txt"};
+      tx.commit();
+      return obj;
+    });
 
-private:
-  largeobject &m_object;
-  string m_file;
-};
-
-
-class ReadLargeObject : public transactor<>
-{
-public:
-  explicit ReadLargeObject(largeobject &O) :
-    transactor<>("ReadLargeObject"),
-    m_object(O)
-  {
-  }
-
-  void operator()(argument_type &T)
-  {
-    char Buf[200];
-    largeobjectaccess O(T, m_object, ios::in);
-    const auto len = O.read(Buf, sizeof(Buf)-1);
-    PQXX_CHECK_EQUAL(
+  perform(
+    [&conn, &Obj]()
+    {
+      char Buf[200];
+      work tx{conn};
+      largeobjectaccess O{tx, Obj, ios::in};
+      const auto len = O.read(Buf, sizeof(Buf)-1);
+      PQXX_CHECK_EQUAL(
 	string(Buf, string::size_type(len)),
 	Contents,
 	"Large object contents were mangled.");
-  }
+      tx.commit();
+    });
 
-private:
-  largeobject m_object;
-};
-
-
-class DeleteLargeObject : public transactor<>
-{
-public:
-  explicit DeleteLargeObject(largeobject O) : m_object(O) {}
-
-  void operator()(argument_type &T)
-  {
-    m_object.remove(T);
-  }
-
-private:
-  largeobject m_object;
-};
-
-
-void test_053(transaction_base &orgT)
-{
-  connection_base &C(orgT.conn());
-  orgT.abort();
-
-  largeobject Obj;
-
-  C.perform(ImportLargeObject(Obj, "pqxxlo.txt"));
-  C.perform(ReadLargeObject(Obj));
-  C.perform(DeleteLargeObject(Obj));
+  perform([&conn, &Obj](){ work tx{conn}; Obj.remove(tx); tx.commit(); });
 }
-} // namespace
 
-PQXX_REGISTER_TEST_T(test_053, nontransaction)
+
+PQXX_REGISTER_TEST(test_053);
+} // namespace

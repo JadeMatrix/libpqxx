@@ -26,11 +26,13 @@ struct PQXX_PRIVATE string_traits<row::const_reverse_iterator>
 
 namespace
 {
-void test_result_slicing(transaction_base &t)
+void test_result_slicing()
 {
-  result r = t.exec("SELECT 1");
+  connection conn;
+  work tx{conn};
+  result r = tx.exec("SELECT 1");
 
-  PQXX_CHECK(!r[0].empty(), "A plain row shows up as empty.");
+  PQXX_CHECK(not r[0].empty(), "A plain row shows up as empty.");
 
   // Empty slice at beginning of row.
   pqxx::row s = r[0].slice(0, 0);
@@ -54,7 +56,7 @@ void test_result_slicing(transaction_base &t)
 
   // Slice that matches the entire row.
   s = r[0].slice(0, 1);
-  PQXX_CHECK(!s.empty(), "Nonempty slice shows up as empty.");
+  PQXX_CHECK(not s.empty(), "Nonempty slice shows up as empty.");
   PQXX_CHECK_EQUAL(s.size(), 1u, "size() breaks for non-empty slice.");
   PQXX_CHECK_EQUAL(s.begin() + 1, s.end(), "Iteration is broken.");
   PQXX_CHECK_EQUAL(s.rbegin() + 1, s.rend(), "Reverse iteration is broken.");
@@ -63,9 +65,9 @@ void test_result_slicing(transaction_base &t)
   PQXX_CHECK_THROWS(s.at(1).as<int>(), pqxx::range_error, "at() is off.");
 
   // Meaningful slice at beginning of row.
-  r = t.exec("SELECT 1, 2, 3");
+  r = tx.exec("SELECT 1, 2, 3");
   s = r[0].slice(0, 1);
-  PQXX_CHECK(!s.empty(), "Slicing confuses empty().");
+  PQXX_CHECK(not s.empty(), "Slicing confuses empty().");
   PQXX_CHECK_THROWS(
 	s.at(1).as<int>(),
 	pqxx::range_error,
@@ -73,7 +75,7 @@ void test_result_slicing(transaction_base &t)
 
   // Meaningful slice that skips an initial column.
   s = r[0].slice(1, 2);
-  PQXX_CHECK(!s.empty(), "Slicing away leading columns confuses empty().");
+  PQXX_CHECK(not s.empty(), "Slicing away leading columns confuses empty().");
   PQXX_CHECK_EQUAL(s[0].as<int>(), 2, "Slicing offset is broken.");
   PQXX_CHECK_EQUAL(s.begin()->as<int>(), 2, "Iteration uses wrong offset.");
   PQXX_CHECK_EQUAL(s.begin() + 1, s.end(), "Iteration has wrong range.");
@@ -87,7 +89,7 @@ void test_result_slicing(transaction_base &t)
 	"Offset slicing is broken.");
 
   // Column names in a slice.
-  r = t.exec("SELECT 1 AS one, 2 AS two, 3 AS three");
+  r = tx.exec("SELECT 1 AS one, 2 AS two, 3 AS three");
   s = r[0].slice(1, 2);
   PQXX_CHECK_EQUAL(s["two"].as<int>(), 2, "Column addressing breaks.");
   PQXX_CHECK_THROWS(
@@ -104,10 +106,11 @@ void test_result_slicing(transaction_base &t)
 	"Column name is case sensitive.");
 
   // Identical column names.
-  r = t.exec("SELECT 1 AS x, 2 AS x");
+  r = tx.exec("SELECT 1 AS x, 2 AS x");
   s = r[0].slice(1, 2);
   PQXX_CHECK_EQUAL(s["x"].as<int>(), 2, "Identical column names break slice.");
 }
-} // namespace
 
-PQXX_REGISTER_TEST(test_result_slicing)
+
+PQXX_REGISTER_TEST(test_result_slicing);
+} // namespace

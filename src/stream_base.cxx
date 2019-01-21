@@ -15,8 +15,8 @@
 
 
 pqxx::stream_base::stream_base(transaction_base &tb) :
-  internal::namedclass("stream_base"),
-  internal::transactionfocus(tb),
+  internal::namedclass{"stream_base"},
+  internal::transactionfocus{tb},
   m_finished{false}
 {}
 
@@ -27,13 +27,13 @@ pqxx::stream_base::~stream_base() noexcept
 
 pqxx::stream_base::operator bool() const noexcept
 {
-  return !m_finished;
+  return not m_finished;
 }
 
 
 bool pqxx::stream_base::operator!() const noexcept
 {
-  return !static_cast<bool>(*this);
+  return not static_cast<bool>(*this);
 }
 
 

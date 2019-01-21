@@ -39,8 +39,8 @@ class TestListener final : public notification_receiver
   bool m_done;
 
 public:
-  explicit TestListener(connection_base &C, string Name) :
-    notification_receiver(C, Name), m_done(false)
+  explicit TestListener(connection_base &conn, string Name) :
+    notification_receiver(conn, Name), m_done(false)
   {
   }
 
@@ -56,34 +56,6 @@ public:
   }
 
   bool done() const { return m_done; }
-};
-
-
-// A transactor to trigger our notification listener
-class Notify final : public transactor<nontransaction>
-{
-  string m_channel;
-
-public:
-  explicit Notify(string NotifName) :
-    transactor<nontransaction>("Notifier"), m_channel(NotifName) { }
-
-  void operator()(argument_type &T)
-  {
-    T.exec("NOTIFY \"" + m_channel + "\"");
-  }
-
-  void on_abort(const char Reason[]) noexcept
-  {
-    try
-    {
-      cerr << "Notify failed!" << endl;
-      if (Reason) cerr << "Reason: " << Reason << endl;
-    }
-    catch (const exception &)
-    {
-    }
-  }
 };
 
 
@@ -109,25 +81,28 @@ static void set_fdbit(fd_set &s, int b)
 }
 
 
-void test_087(transaction_base &orgT)
+void test_087()
 {
-  connection_base &C(orgT.conn());
-  orgT.abort();
+  connection conn;
 
   const string NotifName = "my notification";
-  cout << "Adding listener..." << endl;
-  TestListener L(C, NotifName);
+  TestListener L{conn, NotifName};
 
-  cout << "Sending notification..." << endl;
-  C.perform(Notify(L.channel()));
+  perform(
+    [&conn, &L]()
+    {
+      work tx{conn};
+      tx.exec0("NOTIFY " + tx.quote_name(L.channel()));
+      tx.commit();
+    });
 
   int notifs = 0;
-  for (int i=0; (i < 20) && !L.done(); ++i)
+  for (int i=0; (i < 20) and not L.done(); ++i)
   {
     PQXX_CHECK_EQUAL(notifs, 0, "Got unexpected notifications.");
 
     cout << ".";
-    const int fd = C.sock();
+    const int fd = conn.sock();
 
     // File descriptor from which we wish to read.
     fd_set read_fds;
@@ -142,7 +117,7 @@ void test_087(transaction_base &orgT)
 
     timeval timeout = { 1, 0 };
     select(fd+1, &read_fds, nullptr, &except_fds, &timeout);
-    notifs = C.get_notifs();
+    notifs = conn.get_notifs();
   }
   cout << endl;
 
@@ -151,4 +126,5 @@ void test_087(transaction_base &orgT)
 }
 } // namespace
 
-PQXX_REGISTER_TEST_T(test_087, nontransaction)
+
+PQXX_REGISTER_TEST(test_087);

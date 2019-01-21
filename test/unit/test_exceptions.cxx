@@ -7,7 +7,7 @@ using namespace pqxx;
 
 namespace
 {
-void test_exceptions(transaction_base &t)
+void test_exceptions()
 {
   const string
     broken_query = "SELECT HORRIBLE ERROR",
@@ -28,9 +28,11 @@ void test_exceptions(transaction_base &t)
 	"Getting query from pqxx_exception is broken.");
   }
 
+  connection conn;
+  work tx{conn};
   try
   {
-    t.exec("INVALID QUERY HERE");
+    tx.exec("INVALID QUERY HERE");
   }
   catch (const syntax_error &e)
   {
@@ -39,6 +41,7 @@ void test_exceptions(transaction_base &t)
 	e.sqlstate(), "42601", "Unexpected sqlstate on syntax error.");
   }
 }
-} // namespace
 
-PQXX_REGISTER_TEST(test_exceptions)
+
+PQXX_REGISTER_TEST(test_exceptions);
+} // namespace

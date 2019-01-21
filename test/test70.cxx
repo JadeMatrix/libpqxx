@@ -17,7 +17,9 @@ void TestPipeline(pipeline &P, int numqueries)
   for (int i=numqueries; i; --i) P.insert(Q);
   P.resume();
 
-  PQXX_CHECK(!numqueries || !P.empty(), "pipeline::empty() is broken.");
+  PQXX_CHECK(
+	(numqueries == 0) || not P.empty(),
+	"pipeline::empty() is broken.");
 
   int res = 0;
   result Prev;
@@ -25,7 +27,7 @@ void TestPipeline(pipeline &P, int numqueries)
 
   for (int i=numqueries; i; --i)
   {
-    PQXX_CHECK(!P.empty(), "Got no results from pipeline.");
+    PQXX_CHECK(not P.empty(), "Got no results from pipeline.");
 
     auto R = P.retrieve();
 
@@ -49,9 +51,11 @@ void TestPipeline(pipeline &P, int numqueries)
 
 // Test program for libpqxx.  Issue a query repeatedly through a pipeline, and
 // compare results.  Use retain() and resume() for performance.
-void test_070(transaction_base &W)
+void test_070()
 {
-  pipeline P(W);
+  asyncconnection conn;
+  work tx{conn};
+  pipeline P(tx);
 
   PQXX_CHECK(P.empty(), "Pipeline is not empty initially.");
 
@@ -66,9 +70,9 @@ void test_070(transaction_base &W)
   // See if complete() breaks retain() as it should
   P.retain();
   P.insert(Q);
-  PQXX_CHECK(!P.empty(), "Pipeline was empty after insert().");
+  PQXX_CHECK(not P.empty(), "Pipeline was empty after insert().");
   P.complete();
-  PQXX_CHECK(!P.empty(), "complete() emptied pipeline.");
+  PQXX_CHECK(not P.empty(), "complete() emptied pipeline.");
 
   PQXX_CHECK_EQUAL(
 	P.retrieve().second.query(),
@@ -89,11 +93,12 @@ void test_070(transaction_base &W)
   for (int i=0; i<5; ++i) TestPipeline(P, i);
 
   // See if retrieve() fails on an empty pipeline, as it should
-  quiet_errorhandler d(W.conn());
+  quiet_errorhandler d(conn);
   PQXX_CHECK_THROWS_EXCEPTION(
 	P.retrieve(),
 	"Empty pipeline allows retrieve().");
 }
 } // namespace
 
-PQXX_REGISTER_TEST_C(test_070, asyncconnection)
+
+PQXX_REGISTER_TEST(test_070);

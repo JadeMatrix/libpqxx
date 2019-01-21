@@ -11,7 +11,7 @@ using namespace pqxx;
 
 
 // Test program for libpqxx.  Run a query and try various standard C++
-// algorithms on it.
+// algorithms on its result.
 namespace
 {
 
@@ -49,7 +49,7 @@ struct Cmp
 
   bool operator()(const pqxx::row &L, const pqxx::row &R) const
   {
-    return string(L[Key].c_str()) < string(R[Key].c_str());
+    return string{L[Key].c_str()} < string{R[Key].c_str()};
   }
 };
 
@@ -83,18 +83,21 @@ struct CountGreaterSmaller
 };
 
 
-void test_049(transaction_base &T)
+void test_049()
 {
+  connection conn;
+  work tx{conn};
   string Table="pg_tables", Key="tablename";
 
-  result R( T.exec("SELECT * FROM " + Table + " ORDER BY " + Key) );
+  result R( tx.exec("SELECT * FROM " + Table + " ORDER BY " + Key) );
   cout << "Read " << R.size() << " rows." << endl;
-  PQXX_CHECK(!R.empty(), "No rows in " + Table + ".");
+  PQXX_CHECK(not R.empty(), "No rows in " + Table + ".");
 
   // Verify that for each key in R, the number of greater and smaller keys
   // are sensible; use std::for_each<>() to iterate over rows in R
   for_each(R.begin(), R.end(), CountGreaterSmaller(Key, R));
 }
-} // namespace
 
-PQXX_REGISTER_TEST(test_049)
+
+PQXX_REGISTER_TEST(test_049);
+} // namespace

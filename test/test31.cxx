@@ -20,25 +20,28 @@ void InitVector(VEC &V, typename VEC::size_type s, VAL val)
 }
 
 
-void test_031(transaction_base &orgT)
+void test_031()
 {
-  connection_base &C(orgT.conn());
-  orgT.abort();
+  lazyconnection conn;
 
   const string Table = "pg_tables";
 
-  // Tell C we won't be needing it for a while (not true, but let's pretend)
-  C.deactivate();
+  // Tell conn we won't be needing it for a while (not true, but let's pretend).
+#include <pqxx/internal/ignore-deprecated-pre.hxx>
+  conn.deactivate();
+#include <pqxx/internal/ignore-deprecated-post.hxx>
 
   vector<int> NullFields;		// Maps column to no. of null fields
   vector<bool> SortedUp, SortedDown;	// Does column appear to be sorted?
 
-  // Reactivate C (not really needed, but it sounds more polite)
-  C.activate();
+  // Reactivate conn (not really needed, but it sounds more polite).
+#include <pqxx/internal/ignore-deprecated-pre.hxx>
+  conn.activate();
+#include <pqxx/internal/ignore-deprecated-post.hxx>
 
-  work T(C, "test31");
+  work tx(conn, "test31");
 
-  result R( T.exec("SELECT * FROM " + Table) );
+  result R( tx.exec("SELECT * FROM " + Table) );
 
   InitVector(NullFields, R.columns(), 0);
   InitVector(SortedUp, R.columns(), true);
@@ -64,7 +67,7 @@ void test_031(transaction_base &orgT)
       string A, B;
       PQXX_CHECK_EQUAL(
 		i[f].to(A),
-		i[f].to(B, string("")),
+		i[f].to(B, string{""}),
 		"Variants of to() disagree on nullness.");
 
       PQXX_CHECK_EQUAL(A, B, "Variants of to() produce different values.");
@@ -81,10 +84,10 @@ void test_031(transaction_base &orgT)
 
       PQXX_CHECK_NOT_EQUAL(j, i, "Iterator equals successor.");
       PQXX_CHECK(j != i, "Iterator is not different from successor.");
-      PQXX_CHECK(!(j >= i), "Iterator does not precede successor.");
-      PQXX_CHECK(!(j > i), "Iterator follows successor.");
-      PQXX_CHECK(!(i <= j), "operator<=() is asymmetric.");
-      PQXX_CHECK(!(i < j), "operator<() is asymmetric.");
+      PQXX_CHECK(not (j >= i), "Iterator does not precede successor.");
+      PQXX_CHECK(not (j > i), "Iterator follows successor.");
+      PQXX_CHECK(not (i <= j), "operator<=() is asymmetric.");
+      PQXX_CHECK(not (i < j), "operator<() is asymmetric.");
       PQXX_CHECK(j <= i, "operator<=() is inconsistent.");
       PQXX_CHECK(j < i, "operator<() is inconsistent.");
 
@@ -110,13 +113,13 @@ void test_031(transaction_base &orgT)
       // simple strings.
       for (pqxx::row::size_type f = 0; f < R.columns(); ++f)
       {
-        if (!j[f].is_null())
+        if (not j[f].is_null())
         {
           const bool U = SortedUp[f],
                      D = SortedDown[f];
 
-          SortedUp[f] = U & (string(j[f].c_str()) <= string(i[f].c_str()));
-          SortedDown[f] = D & (string(j[f].c_str()) >= string(i[f].c_str()));
+          SortedUp[f] = U & (string{j[f].c_str()} <= string{i[f].c_str()});
+          SortedDown[f] = D & (string{j[f].c_str()} >= string{i[f].c_str()});
         }
       }
     }
@@ -143,6 +146,7 @@ void test_031(transaction_base &orgT)
 	"Found more nulls than there were rows.");
   }
 }
-} // namespace
 
-PQXX_REGISTER_TEST_CT(test_031, lazyconnection, nontransaction)
+
+PQXX_REGISTER_TEST(test_031);
+} // namespace

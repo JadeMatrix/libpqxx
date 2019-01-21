@@ -5,7 +5,7 @@
  *
  * DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/transaction_base instead.
  *
- * Copyright (c) 2001-2018, Jeroen T. Vermeulen.
+ * Copyright (c) 2001-2019, Jeroen T. Vermeulen.
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -44,9 +44,9 @@ class PQXX_LIBEXPORT transactionfocus : public virtual namedclass
 {
 public:
   explicit transactionfocus(transaction_base &t) :
-    namedclass("transactionfocus"),
-    m_trans(t),
-    m_registered(false)
+    namedclass{"transactionfocus"},
+    m_trans{t},
+    m_registered{false}
   {
   }
 
@@ -73,7 +73,8 @@ private:
 class PQXX_LIBEXPORT parameterized_invocation : statement_parameters
 {
 public:
-  parameterized_invocation(connection_base &, const std::string &query);
+  PQXX_DEPRECATED parameterized_invocation(
+	connection_base &, const std::string &query);
 
   parameterized_invocation &operator()() { add_param(); return *this; }
   parameterized_invocation &operator()(const binarystring &v)
@@ -90,7 +91,8 @@ public:
 
 private:
   /// Not allowed
-  parameterized_invocation &operator=(const parameterized_invocation &);
+  parameterized_invocation &operator=(const parameterized_invocation &)
+	=delete;
 
   connection_base &m_home;
   const std::string m_query;
@@ -104,6 +106,7 @@ namespace gate
 {
 class transaction_subtransaction;
 class transaction_tablereader;
+class transaction_sql_cursor;
 class transaction_stream_from;
 class transaction_tablewriter;
 class transaction_stream_to;
@@ -241,11 +244,11 @@ public:
    */
   result exec(
 	const std::string &Query,
-	const std::string &Desc=std::string());				//[t01]
+	const std::string &Desc=std::string{});				//[t01]
 
   result exec(
 	const std::stringstream &Query,
-	const std::string &Desc=std::string())
+	const std::string &Desc=std::string{})
 	{ return exec(Query.str(), Desc); }
 
   /// Execute query, which should zero rows of data.
@@ -256,7 +259,7 @@ public:
    */
   result exec0(
 	const std::string &Query,
-	const std::string &Desc=std::string())
+	const std::string &Desc=std::string{})
 	{ return exec_n(0, Query, Desc); }
 
   /// Execute query returning a single row of data.
@@ -266,7 +269,7 @@ public:
    *
    * @throw unexpected_rows If the query returned the wrong number of rows.
    */
-  row exec1(const std::string &Query, const std::string &Desc=std::string())
+  row exec1(const std::string &Query, const std::string &Desc=std::string{})
 	{ return exec_n(1, Query, Desc).front(); }
 
   /// Execute query, expect given number of rows.
@@ -278,7 +281,7 @@ public:
   result exec_n(
         size_t rows,
 	const std::string &Query,
-	const std::string &Desc=std::string());
+	const std::string &Desc=std::string{});
 
   /**
    * @name Parameterized statements
@@ -313,7 +316,8 @@ public:
   template<typename ...Args>
   result exec_params(const std::string &query, Args &&...args)
   {
-    return internal_exec_params(query, internal::params(std::forward<Args>(args)...));
+    return internal_exec_params(
+      query, internal::params(std::forward<Args>(args)...));
   }
 
   // Execute parameterised statement, expect a single-row result.
@@ -387,7 +391,8 @@ public:
   template<typename ...Args>
   result exec_prepared(const std::string &statement, Args&&... args)
   {
-    return internal_exec_prepared(statement, internal::params(std::forward<Args>(args)...));
+    return internal_exec_prepared(
+      statement, internal::params(std::forward<Args>(args)...));
   }
 
   /// Execute a prepared statement, and expect a single-row result.
@@ -463,7 +468,7 @@ public:
    * statement instead.
    */
   PQXX_DEPRECATED prepare::invocation
-  prepared(const std::string &statement=std::string());
+  prepared(const std::string &statement=std::string{});
 
   //@}
 
@@ -589,7 +594,7 @@ private:
   PQXX_PRIVATE void CheckPendingError();
 
   template<typename T> bool parm_is_null(T *p) const noexcept
-	{ return !p; }
+	{ return p == nullptr; }
   template<typename T> bool parm_is_null(T) const noexcept
 	{ return false; }
 
@@ -628,7 +633,6 @@ private:
 	const std::string &Columns);
   void write_copy_line(const std::string &);
   void end_copy_write();
-  internal::encoding_group current_encoding();
 
   friend class pqxx::internal::gate::transaction_subtransaction;
 
@@ -644,5 +648,4 @@ private:
 } // namespace pqxx
 
 #include "pqxx/compiler-internal-post.hxx"
-
 #endif

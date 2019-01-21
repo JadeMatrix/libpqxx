@@ -10,7 +10,7 @@
  */
 #include "pqxx/compiler-internal.hxx"
 
-#include "pqxx/stream_to"
+#include "pqxx/stream_to.hxx"
 
 #include "pqxx/internal/gates/transaction-stream_to.hxx"
 
@@ -19,10 +19,10 @@ pqxx::stream_to::stream_to(
   transaction_base &tb,
   const std::string &table_name
 ) :
-  namedclass("stream_from", table_name),
-  stream_base(tb)
+  namedclass{"stream_to", table_name},
+  stream_base{tb}
 {
-  setup(tb, table_name);
+  set_up(tb, table_name);
 }
 
 
@@ -63,16 +63,16 @@ pqxx::stream_to & pqxx::stream_to::operator<<(stream_from &tr)
 }
 
 
-void pqxx::stream_to::setup(
+void pqxx::stream_to::set_up(
   transaction_base &tb,
   const std::string &table_name
 )
 {
-  setup(tb, table_name, "");
+  set_up(tb, table_name, "");
 }
 
 
-void pqxx::stream_to::setup(
+void pqxx::stream_to::set_up(
   transaction_base &tb,
   const std::string &table_name,
   const std::string &columns
@@ -127,7 +127,7 @@ std::string pqxx::internal::TypedCopyEscaper::escape(const std::string &s)
     case '\v': escaped += "\\v";  break; // Carriage return
     case '\\': escaped += "\\\\"; break; // Backslash
     default:
-      if (c < ' ' || c > '~')
+      if (c < ' ' or c > '~')
       {
         escaped += "\\";
         for (auto i = 2; i >= 0; --i)

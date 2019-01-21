@@ -12,20 +12,20 @@ using namespace pqxx;
 // connection.
 namespace
 {
-void test_030(transaction_base &)
+void test_030()
 {
   const string Table = "pg_tables";
 
-  lazyconnection C;
-  work T(C, "test30");
+  lazyconnection conn;
+  work tx{conn, "test30"};
 
-  result R( T.exec(("SELECT * FROM " + Table).c_str()) );
-  PQXX_CHECK(!R.empty(), "Table " + Table + " is empty, cannot test.");
+  result R( tx.exec(("SELECT * FROM " + Table).c_str()) );
+  PQXX_CHECK(not R.empty(), "Table " + Table + " is empty, cannot test.");
 
   // Print column names
   for (pqxx::row::size_type c = 0; c < R.columns(); ++c)
   {
-    string N= R.column_name(c);
+    string N = R.column_name(c);
     cout << c << ":\t" << N << endl;
 
     PQXX_CHECK_EQUAL(
@@ -58,12 +58,12 @@ void test_030(transaction_base &)
     string N = R.column_name(c);
 
     PQXX_CHECK_EQUAL(
-	string(R[0].at(c).c_str()),
+	string{R[0].at(c).c_str()},
 	R[0].at(N).c_str(),
 	"Different field values by name and by number.");
 
     PQXX_CHECK_EQUAL(
-	string(R[0][c].c_str()),
+	string{R[0][c].c_str()},
 	R[0][N].c_str(),
 	"at() is inconsistent with operator[].");
 
@@ -78,6 +78,7 @@ void test_030(transaction_base &)
 	"Inconsistent field lengths.");
   }
 }
-} // namespace
 
-PQXX_REGISTER_TEST_NODB(test_030)
+
+PQXX_REGISTER_TEST(test_030);
+} // namespace

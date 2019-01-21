@@ -12,9 +12,10 @@ PQXX_DECLARE_ENUM_CONVERSION(EnumA);
 PQXX_DECLARE_ENUM_CONVERSION(EnumB);
 }
 
+
 namespace
 {
-void test_string_conversion(transaction_base &)
+void test_string_conversion()
 {
   PQXX_CHECK_EQUAL(
 	"C string array",
@@ -115,6 +116,7 @@ void test_string_conversion(transaction_base &)
   from_string("2", ea);
   PQXX_CHECK_EQUAL(ea, ea2, "String-to-enum conversion is broken.");
 }
-}
 
-PQXX_REGISTER_TEST_NODB(test_string_conversion)
+
+PQXX_REGISTER_TEST(test_string_conversion);
+} // namespace

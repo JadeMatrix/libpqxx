@@ -12,22 +12,22 @@ using namespace pqxx;
 
 namespace
 {
-void test_012(transaction_base &orgT)
+void test_012()
 {
-  connection_base &C(orgT.conn());
-  orgT.abort();
-
+  connection conn;
   const string Table = "pg_tables";
 
+#include <pqxx/internal/ignore-deprecated-pre.hxx>
   // Tell C we won't be needing it for a while (not true, but let's pretend)
-  C.deactivate();
+  conn.deactivate();
 
   // ...And reactivate C (not really needed, but it sounds more polite)
-  C.activate();
+  conn.activate();
+#include <pqxx/internal/ignore-deprecated-post.hxx>
 
-  work T(C, "test12");
+  work tx{conn, "test12"};
 
-  result R( T.exec("SELECT * FROM " + Table) );
+  result R( tx.exec("SELECT * FROM " + Table) );
 
   // Map column to no. of null fields.
   vector<int> NullFields(R.columns(), 0);
@@ -53,7 +53,7 @@ void test_012(transaction_base &orgT)
       string A, B;
       PQXX_CHECK_EQUAL(
 	i[f].to(A),
-	i[f].to(B, string("")),
+	i[f].to(B, string{""}),
 	"Variants of to() disagree on nullness.");
 
       PQXX_CHECK_EQUAL(A, B, "Inconsistent field contents.");
@@ -68,12 +68,12 @@ void test_012(transaction_base &orgT)
       // their interrelationship...
       PQXX_CHECK_EQUAL(i - j, 1, "Iterator is wrong distance from successor.");
 
-      PQXX_CHECK(!(j == i), "Iterator equals its successor.");
+      PQXX_CHECK(not (j == i), "Iterator equals its successor.");
       PQXX_CHECK(j != i, "Iterator inequality is inconsistent.");
-      PQXX_CHECK(!(j >= i), "Iterator doesn't come before its successor.");
-      PQXX_CHECK(!(j > i), "Iterator is preceded by its successor.");
-      PQXX_CHECK(!(i <= j), "Iterator doesn't come after its predecessor.");
-      PQXX_CHECK(!(i < j), "Iterator is succeded by its predecessor.");
+      PQXX_CHECK(not (j >= i), "Iterator doesn't come before its successor.");
+      PQXX_CHECK(not (j > i), "Iterator is preceded by its successor.");
+      PQXX_CHECK(not (i <= j), "Iterator doesn't come after its predecessor.");
+      PQXX_CHECK(not (i < j), "Iterator is succeded by its predecessor.");
       PQXX_CHECK(j <= i, "operator<=() doesn't mirror operator>=().");
       PQXX_CHECK(j < i, "operator<() doesn't mirror operator>().");
 
@@ -99,14 +99,14 @@ void test_012(transaction_base &orgT)
       // simple strings.
       for (pqxx::row::size_type f = 0; f < R.columns(); ++f)
       {
-        if (!j[f].is_null())
+        if (not j[f].is_null())
         {
           const bool
 		U = SortedUp[f],
 		D = SortedDown[f];
 
-          SortedUp[f] = U & (string(j[f].c_str()) <= string(i[f].c_str()));
-          SortedDown[f] = D & (string(j[f].c_str()) >= string(i[f].c_str()));
+          SortedUp[f] = U & (string{j[f].c_str()} <= string{i[f].c_str()});
+          SortedDown[f] = D & (string{j[f].c_str()} >= string{i[f].c_str()});
         }
       }
     }
@@ -117,6 +117,7 @@ void test_012(transaction_base &orgT)
 	NullFields[f] <= int(R.size()),
 	"Found more nulls than there were rows.");
 }
-} // namespace
 
-PQXX_REGISTER_TEST_T(test_012, nontransaction)
+
+PQXX_REGISTER_TEST(test_012);
+} // namespace

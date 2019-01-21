@@ -1,5 +1,6 @@
 /* main() definition for libpqxx test runners.
  */
+#include <cassert>
 #include <iostream>
 #include <list>
 #include <new>
@@ -38,25 +39,6 @@ test_failure::test_failure(const string &ffile, int fline, const string &desc) :
 test_failure::~test_failure() noexcept {}
 
 
-base_test::base_test(const string &tname, testfunc func) :
-  m_name(tname),
-  m_func(func)
-{
-  register_test(this);
-}
-
-
-base_test::~base_test() {}
-
-
-const test_map &register_test(base_test *tc)
-{
-  static test_map tests;
-  if (tc) tests[tc->name()] = tc;
-  return tests;
-}
-
-
 /// Drop table, if it exists.
 void drop_table(transaction_base &t, const std::string &table)
 {
@@ -77,7 +59,7 @@ void check(
 	const char text[],
 	string desc)
 {
-  if (!condition)
+  if (not condition)
     throw test_failure(
 	file,
 	line,
@@ -136,22 +118,46 @@ void create_pqxxevents(transaction_base &t)
 } // namespace pqxx
 
 
+namespace
+{
+std::map<const char *, testfunc> *all_tests = nullptr;
+} // namespace
+
+
+namespace pqxx
+{
+namespace test
+{
+void register_test(const char name[], testfunc func)
+{
+  if (all_tests == nullptr)
+  {
+    all_tests = new std::map<const char *, testfunc>();
+  }
+  else
+  {
+    assert(all_tests->find(name) == all_tests->end());
+  }
+  (*all_tests)[name] = func;
+}
+} // namespace pqxx::test
+} // namespace pqxx
+
 int main(int, const char *argv[])
 {
   const char *const test_name = argv[1];
-  const test_map &tests = register_test(nullptr);
 
   int test_count = 0;
   list<string> failed;
-  for (const auto &i: tests)
-    if (!test_name || test_name == i.first)
+  for (const auto &i: *all_tests)
+    if (test_name == nullptr or test_name == i.first)
     {
       cout << endl << "Running: " << i.first << endl;
 
       bool success = false;
       try
       {
-        i.second->run();
+        i.second();
         success = true;
       }
       catch (const test_failure &e)
@@ -183,7 +189,7 @@ int main(int, const char *argv[])
         cerr << "Unknown exception" << endl;
       }
 
-      if (!success)
+      if (not success)
       {
         cerr << "FAILED: " << i.first << endl;
         failed.push_back(i.first);
@@ -193,7 +199,7 @@ int main(int, const char *argv[])
 
   cout << "Ran " << test_count << " test(s)." << endl;
 
-  if (!failed.empty())
+  if (not failed.empty())
   {
     cerr << "*** " << failed.size() << " test(s) failed: ***" << endl;
     for (const auto &i: failed) cerr << "\t" << i << endl;

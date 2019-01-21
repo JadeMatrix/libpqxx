@@ -9,7 +9,7 @@
 # The template2mak.py script should be available in the tools directory of the
 # libpqxx source archive.
 #
-# Generated from template 'win32/MinGW.mak.template'.
+# Generated from template './win32/MinGW.mak.template'.
 ################################################################################
 # MinGW makefile for libpqxx.  Don't use this; use the configure script instead!
 # Based on original contributed by Pasquale Fersini <basquale.fersini@libero.it>
@@ -37,6 +37,7 @@ OBJ = \
   src/result.o \
   src/robusttransaction.o \
   src/row.o \
+  src/sql_cursor.o \
   src/statement_parameters.o \
   src/strconv.o \
   src/stream_base.o \
@@ -127,6 +128,9 @@ src/robusttransaction.o: src/robusttransaction.cxx
 
 src/row.o: src/row.cxx
 	$(CXX) $(CPPFLAGS) -c src/row.cxx -o src/row.o $(CXXFLAGS)
+
+src/sql_cursor.o: src/sql_cursor.cxx
+	$(CXX) $(CPPFLAGS) -c src/sql_cursor.cxx -o src/sql_cursor.o $(CXXFLAGS)
 
 src/statement_parameters.o: src/statement_parameters.cxx
 	$(CXX) $(CPPFLAGS) -c src/statement_parameters.cxx -o src/statement_parameters.o $(CXXFLAGS)

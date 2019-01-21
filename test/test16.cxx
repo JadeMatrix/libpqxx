@@ -6,13 +6,14 @@ using namespace std;
 using namespace pqxx;
 
 
-// Simple test program for libpqxx.  Open connection to database, start
-// a dummy transaction to gain nontransactional access, and perform a query.
+// Test robusttransaction.
 namespace
 {
-void test_016(transaction_base &T)
+void test_016()
 {
-  result R( T.exec("SELECT * FROM pg_tables") );
+  connection conn;
+  robusttransaction<> tx{conn};
+  result R{ tx.exec("SELECT * FROM pg_tables") };
 
   result::const_iterator c;
   for (c = R.begin(); c != R.end(); ++c)
@@ -40,12 +41,11 @@ void test_016(transaction_base &T)
 	R.back()[i].as(nullstr),
 	"Value mismatch in back().");
     PQXX_CHECK(c == R.back(), "Row equality is broken.");
-    PQXX_CHECK(!(c != R.back()), "Row inequality is broken.");
+    PQXX_CHECK(not (c != R.back()), "Row inequality is broken.");
 
-  // "Commit" the non-transaction.  This doesn't really do anything since
-  // NonTransaction doesn't start a backend transaction.
-  T.commit();
+  tx.commit();
 }
-} // namespace
 
-PQXX_REGISTER_TEST_T(test_016, robusttransaction<>)
+
+PQXX_REGISTER_TEST(test_016);
+} // namespace

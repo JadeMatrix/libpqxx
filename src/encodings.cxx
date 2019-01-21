@@ -1,6 +1,6 @@
 /** Implementation of string encodings support
  *
- * Copyright (c) 2001-2018, Jeroen T. Vermeulen.
+ * Copyright (c) 2001-2019, Jeroen T. Vermeulen.
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -11,6 +11,7 @@
 #include "pqxx/except.hxx"
 #include "pqxx/internal/encodings.hxx"
 
+#include <cstring>
 #include <iomanip>
 #include <map>
 #include <sstream>
@@ -20,20 +21,22 @@ using namespace pqxx::internal;
 extern "C"
 {
 #include "libpq-fe.h"
-// These headers would be needed (in this order) to use the libpq encodings enum
-// directly, which the pg_wchar.h header explicitly warns against doing:
-// #include "internal/c.h"
-// #include "server/mb/pg_wchar.h"
 }
 
 
 // Internal helper functions
 namespace
 {
+/// Extract byte from buffer, return as unsigned char.
+unsigned char get_byte(const char buffer[], std::string::size_type offset)
+{
+  return static_cast<unsigned char>(buffer[offset]);
+}
+
 
 [[noreturn]] void throw_for_encoding_error(
   const char* encoding_name,
-  const char* buffer,
+  const char buffer[],
   std::string::size_type start,
   std::string::size_type count
 )
@@ -51,78 +54,70 @@ namespace
   ;
   for (std::string::size_type i{0}; i < count; ++i)
   {
-    s << "0x" << static_cast<unsigned int>(
-      static_cast<unsigned char>(buffer[start + i])
-    );
+    s << "0x" << static_cast<unsigned int>(get_byte(buffer, start + i));
     if (i + 1 < count) s << " ";
   }
   throw pqxx::argument_error{s.str()};
 }
 
+
+/// Does value lie between bottom and top, inclusive?
+constexpr bool between_inc(unsigned char value, unsigned bottom, unsigned top)
+{
+  return value >= bottom and value <= top;
+}
+
+
 /*
 EUC-JP and EUC-JIS-2004 represent slightly different code points but iterate
-the same
-https://en.wikipedia.org/wiki/Extended_Unix_Code#EUC-JP
-http://x0213.org/codetable/index.en.html
+the same:
+ * https://en.wikipedia.org/wiki/Extended_Unix_Code#EUC-JP
+ * http://x0213.org/codetable/index.en.html
 */
-seq_position next_seq_for_euc_jplike(
-  const char* buffer,
-  std::string::size_type buffer_len,
-  std::string::size_type start,
-  const char* encoding_name
-)
+std::string::size_type next_seq_for_euc_jplike(
+	const char buffer[],
+	std::string::size_type buffer_len,
+	std::string::size_type start,
+	const char encoding_name[])
 {
-  if (start >= buffer_len)
-    return {std::string::npos, std::string::npos};
-  else if (static_cast<unsigned char>(buffer[start]) < 0x80)
-    return {start, start + 1};
-  else
+  if (start >= buffer_len) return std::string::npos;
+
+  const auto byte1 = get_byte(buffer, start);
+  if (byte1 < 0x80) return start + 1;
+
+  if (start + 2 > buffer_len)
+    throw_for_encoding_error(encoding_name, buffer, start, 1);
+
+  const auto byte2 = get_byte(buffer, start + 1);
+  if (byte1 == 0x8e)
   {
-    if (
-         static_cast<unsigned char>(buffer[start]) == 0x8E
-      && start + 2 <= buffer_len
-    )
-    {
-      if (
-           static_cast<unsigned char>(buffer[start + 1]) >= 0xA1
-        && static_cast<unsigned char>(buffer[start + 1]) <= 0xFE
-      )
-        return {start, start + 2};
-      else
-        throw_for_encoding_error(encoding_name, buffer, start, 2);
-    }
-    else if (
-         static_cast<unsigned char>(buffer[start]) >= 0xA1
-      && static_cast<unsigned char>(buffer[start]) <= 0xFE
-      && start + 2 <= buffer_len
-    )
-    {
-      if (
-           static_cast<unsigned char>(buffer[start + 1]) >= 0xA1
-        && static_cast<unsigned char>(buffer[start + 1]) <= 0xFE
-      )
-        return {start, start + 2};
-      else
-        throw_for_encoding_error(encoding_name, buffer, start, 2);
-    }
-    else if (
-         static_cast<unsigned char>(buffer[start]) == 0x8F
-      && start + 3 <= buffer_len
-    )
-    {
-      if (
-           static_cast<unsigned char>(buffer[start + 1]) >= 0xA1
-        && static_cast<unsigned char>(buffer[start + 1]) <= 0xFE
-        && static_cast<unsigned char>(buffer[start + 2]) >= 0xA1
-        && static_cast<unsigned char>(buffer[start + 2]) <= 0xFE
-      )
-        return {start, start + 3};
-      else
-        throw_for_encoding_error(encoding_name, buffer, start, 3);
-    }
-    else
-      throw_for_encoding_error(encoding_name, buffer, start, 1);
+    if (not between_inc(byte2, 0xa1, 0xfe))
+      throw_for_encoding_error(encoding_name, buffer, start, 2);
+
+    return start + 2;
   }
+
+  if (between_inc(byte1, 0xa1, 0xfe))
+  {
+    if (not between_inc(byte2, 0xa1, 0xfe))
+      throw_for_encoding_error(encoding_name, buffer, start, 2);
+
+    return start + 2;
+  }
+
+  if (byte1 == 0x8f and start + 3 <= buffer_len)
+  {
+    const auto byte3 = get_byte(buffer, start + 2);
+    if (
+	not between_inc(byte2, 0xa1, 0xfe) or
+        not between_inc(byte3, 0xa1, 0xfe)
+      )
+      throw_for_encoding_error(encoding_name, buffer, start, 3);
+
+    return start + 3;
+  }
+
+  throw_for_encoding_error(encoding_name, buffer, start, 1);
 }
 
 /*
@@ -135,63 +130,39 @@ first byte in 2-byte sequences.
 */
 // https://en.wikipedia.org/wiki/Shift_JIS#Shift_JIS_byte_map
 // http://x0213.org/codetable/index.en.html
-seq_position next_seq_for_sjislike(
-  const char* buffer,
+std::string::size_type next_seq_for_sjislike(
+  const char buffer[],
   std::string::size_type buffer_len,
   std::string::size_type start,
   const char* encoding_name
 )
 {
-  if (start >= buffer_len)
-    return {std::string::npos, std::string::npos};
-  else if (
-    static_cast<unsigned char>(buffer[start]) < 0x80
-    || (
-         static_cast<unsigned char>(buffer[start]) >= 0xA1
-      && static_cast<unsigned char>(buffer[start]) <= 0xDF
-    )
-  )
-    return {start, start + 1};
-  else
-  {
-    if ((
-         static_cast<unsigned char>(buffer[start]) >= 0x81
-      && static_cast<unsigned char>(buffer[start]) <= 0x9F
-    ) || (
-         static_cast<unsigned char>(buffer[start]) >= 0xE0
-      // && static_cast<unsigned char>(buffer[start]) <= 0xEF
-      && static_cast<unsigned char>(buffer[start]) <= 0xFC
-    ))
-    {
-      if (start + 2 <= buffer_len)
-      {
-        if ((
-             /*static_cast<unsigned char>(buffer[start    ]) % 2 == 1
-          && */static_cast<unsigned char>(buffer[start + 1]) >= 0x40
-          && static_cast<unsigned char>(buffer[start + 1]) <= 0x9E
-          && static_cast<unsigned char>(buffer[start + 1]) != 0x7F
-        ) || (
-             /*static_cast<unsigned char>(buffer[start    ]) % 2 == 0
-          && */static_cast<unsigned char>(buffer[start + 1]) >= 0x9F
-          && static_cast<unsigned char>(buffer[start + 1]) <= 0xFC
-        ))
-          return {start, start + 2};
-        else
-          throw_for_encoding_error(encoding_name, buffer, start, 2);
-      }
-      else
-        throw_for_encoding_error(
-          encoding_name,
-          buffer,
-          start,
-          buffer_len - start
-        );
-    }
-    else
-      throw_for_encoding_error(encoding_name, buffer, start, 1);
-  }
-}
+  if (start >= buffer_len) return std::string::npos;
 
+  const auto byte1 = get_byte(buffer, start);
+  if (byte1 < 0x80 or between_inc(byte1, 0xa1, 0xdf)) return start + 1;
+
+  if (
+	not between_inc(byte1, 0x81, 0x9f) and
+	not between_inc(byte1, 0xe0, 0xfc)
+  )
+    throw_for_encoding_error(encoding_name, buffer, start, 1);
+
+  if (start + 2 > buffer_len)
+    throw_for_encoding_error(
+	encoding_name,
+	buffer,
+	start,
+	buffer_len - start);
+
+  const auto byte2 = get_byte(buffer, start + 1);
+  if (byte2 == 0x7f) throw_for_encoding_error(encoding_name, buffer, start, 2);
+
+  if (between_inc(byte2, 0x40, 0x9e) or between_inc(byte2, 0x9f, 0xfc))
+    return start + 2;
+
+  throw_for_encoding_error(encoding_name, buffer, start, 2);
+}
 } // namespace
 
 
@@ -200,52 +171,47 @@ namespace pqxx
 {
 namespace internal
 {
+template<encoding_group> struct glyph_scanner
+{
+  static std::string::size_type call(
+	const char buffer[],
+	std::string::size_type buffer_len,
+	std::string::size_type start);
+};
 
-template<> seq_position next_seq<encoding_group::MONOBYTE>(
-  const char * /* buffer */,
+template<>
+std::string::size_type glyph_scanner<encoding_group::MONOBYTE>::call(
+  const char /* buffer */[],
   std::string::size_type buffer_len,
   std::string::size_type start
 )
 {
-  if (start >= buffer_len)
-    return {std::string::npos, std::string::npos};
-  else
-    return {start, start + 1};
+  if (start >= buffer_len) return std::string::npos;
+  else return start + 1;
 }
 
 // https://en.wikipedia.org/wiki/Big5#Organization
-template<> seq_position next_seq<encoding_group::BIG5>(
-  const char* buffer,
+template<> std::string::size_type glyph_scanner<encoding_group::BIG5>::call(
+  const char buffer[],
   std::string::size_type buffer_len,
   std::string::size_type start
 )
 {
-  if (start >= buffer_len)
-    return {std::string::npos, std::string::npos};
-  else if (static_cast<unsigned char>(buffer[start]) < 0x80)
-    return {start, start + 1};
-  else
-  {
-    if (
-         static_cast<unsigned char>(buffer[start]) >= 0x81
-      && static_cast<unsigned char>(buffer[start]) <= 0xFE
-      && start + 2 <= buffer_len
-    )
-    {
-      if ((
-           static_cast<unsigned char>(buffer[start + 1]) >= 0x40
-        && static_cast<unsigned char>(buffer[start + 1]) <= 0x7E
-      ) || (
-           static_cast<unsigned char>(buffer[start + 1]) >= 0xA1
-        && static_cast<unsigned char>(buffer[start + 1]) <= 0xFE
-      ))
-        return {start, start + 2};
-      else
-        throw_for_encoding_error("BIG5", buffer, start, 2);
-    }
-    else
-      throw_for_encoding_error("BIG5", buffer, start, 1);
-  }
+  if (start >= buffer_len) return std::string::npos;
+
+  const auto byte1 = get_byte(buffer, start);
+  if (byte1 < 0x80) return start + 1;
+
+  if (not between_inc(byte1, 0x81, 0xfe) or (start + 2 > buffer_len))
+    throw_for_encoding_error("BIG5", buffer, start, 1);
+
+  const auto byte2 = get_byte(buffer, start + 1);
+  if (
+	not between_inc(byte2, 0x40, 0x7e) and
+	not between_inc(byte2, 0xa1, 0xfe))
+    throw_for_encoding_error("BIG5", buffer, start, 2);
+
+  return start + 2;
 }
 
 /*
@@ -260,39 +226,29 @@ depending on the specific extension:
 */
 
 // https://en.wikipedia.org/wiki/GB_2312#EUC-CN
-template<> seq_position next_seq<encoding_group::EUC_CN>(
-  const char* buffer,
+template<> std::string::size_type glyph_scanner<encoding_group::EUC_CN>::call(
+  const char buffer[],
   std::string::size_type buffer_len,
   std::string::size_type start
 )
 {
-  if (start >= buffer_len)
-    return {std::string::npos, std::string::npos};
-  else if (static_cast<unsigned char>(buffer[start]) < 0x80)
-    return {start, start + 1};
-  else
-  {
-    if (
-         static_cast<unsigned char>(buffer[start]) >= 0xA1
-      && static_cast<unsigned char>(buffer[start]) <= 0xF7
-      && start + 2 <= buffer_len
-    )
-    {
-      if (
-           static_cast<unsigned char>(buffer[start + 1]) >= 0xA1
-        && static_cast<unsigned char>(buffer[start + 1]) <= 0xFE
-      )
-        return {start, start + 2};
-      else
-        throw_for_encoding_error("EUC_CN", buffer, start, 2);
-    }
-    else
-      throw_for_encoding_error("EUC_CN", buffer, start, 1);
-  }
+  if (start >= buffer_len) return std::string::npos;
+
+  const auto byte1 = get_byte(buffer, start);
+  if (byte1 < 0x80) return start + 1;
+
+  if (not between_inc(byte1, 0xa1, 0xf7) or start + 2 > buffer_len)
+    throw_for_encoding_error("EUC_CN", buffer, start, 1);
+
+  const auto byte2 = get_byte(buffer, start + 1);
+  if (not between_inc(byte2, 0xa1, 0xfe))
+    throw_for_encoding_error("EUC_CN", buffer, start, 2);
+
+  return start + 2;
 }
 
-template<> seq_position next_seq<encoding_group::EUC_JP>(
-  const char* buffer,
+template<> std::string::size_type glyph_scanner<encoding_group::EUC_JP>::call(
+  const char buffer[],
   std::string::size_type buffer_len,
   std::string::size_type start
 )
@@ -300,8 +256,9 @@ template<> seq_position next_seq<encoding_group::EUC_JP>(
   return next_seq_for_euc_jplike(buffer, buffer_len, start, "EUC_JP");
 }
 
-template<> seq_position next_seq<encoding_group::EUC_JIS_2004>(
-  const char* buffer,
+template<>
+std::string::size_type glyph_scanner<encoding_group::EUC_JIS_2004>::call(
+  const char buffer[],
   std::string::size_type buffer_len,
   std::string::size_type start
 )
@@ -310,263 +267,193 @@ template<> seq_position next_seq<encoding_group::EUC_JIS_2004>(
 }
 
 // https://en.wikipedia.org/wiki/Extended_Unix_Code#EUC-KR
-template<> seq_position next_seq<encoding_group::EUC_KR>(
-  const char* buffer,
+template<> std::string::size_type glyph_scanner<encoding_group::EUC_KR>::call(
+  const char buffer[],
   std::string::size_type buffer_len,
   std::string::size_type start
 )
 {
-  if (start >= buffer_len)
-    return {std::string::npos, std::string::npos};
-  else if (static_cast<unsigned char>(buffer[start]) < 0x80)
-    return {start, start + 1};
-  else
-  {
-    if (
-         static_cast<unsigned char>(buffer[start]) >= 0xA1
-      && static_cast<unsigned char>(buffer[start]) <= 0xFE
-      && start + 2 <= buffer_len
-    )
-    {
-      if (
-           static_cast<unsigned char>(buffer[start + 1]) >= 0xA1
-        && static_cast<unsigned char>(buffer[start + 1]) <= 0xFE
-      )
-        return {start, start + 2};
-      else
-        throw_for_encoding_error("EUC_KR", buffer, start, 1);
-    }
-    else
-      throw_for_encoding_error("EUC_KR", buffer, start, 1);
-  }
+  if (start >= buffer_len) return std::string::npos;
+
+  const auto byte1 = get_byte(buffer, start);
+  if (byte1 < 0x80) return start + 1;
+
+  if (not between_inc(byte1, 0xa1, 0xfe) or start + 2 > buffer_len)
+    throw_for_encoding_error("EUC_KR", buffer, start, 1);
+
+  const auto byte2 = get_byte(buffer, start + 1);
+  if (not between_inc(byte2, 0xa1, 0xfe))
+    throw_for_encoding_error("EUC_KR", buffer, start, 1);
+
+  return start + 2;
 }
 
 // https://en.wikipedia.org/wiki/Extended_Unix_Code#EUC-TW
-template<> seq_position next_seq<encoding_group::EUC_TW>(
-  const char* buffer,
+template<> std::string::size_type glyph_scanner<encoding_group::EUC_TW>::call(
+  const char buffer[],
   std::string::size_type buffer_len,
   std::string::size_type start
 )
 {
-  if (start >= buffer_len)
-    return {std::string::npos, std::string::npos};
-  else if (static_cast<unsigned char>(buffer[start]) < 0x80)
-    return {start, start + 1};
-  else
+  if (start >= buffer_len) return std::string::npos;
+
+  const auto byte1 = get_byte(buffer, start);
+  if (byte1 < 0x80) return start + 1;
+
+  if (start + 2 > buffer_len)
+    throw_for_encoding_error("EUC_KR", buffer, start, 1);
+
+  const auto byte2 = get_byte(buffer, start + 1);
+  if (between_inc(byte1, 0xa1, 0xfe))
   {
-    if (
-         static_cast<unsigned char>(buffer[start]) >= 0xA1
-      && static_cast<unsigned char>(buffer[start]) <= 0xFE
-      && start + 2 <= buffer_len
-    )
-    {
-      if (
-           static_cast<unsigned char>(buffer[start + 1]) >= 0xA1
-        && static_cast<unsigned char>(buffer[start + 1]) <= 0xFE
-      )
-        return {start, start + 2};
-      else
-        throw_for_encoding_error("EUC_KR", buffer, start, 2);
-    }
-    else if (
-         static_cast<unsigned char>(buffer[start]) == 0x8E
-      && start + 4 <= buffer_len
-    )
-    {
-      if (
-           static_cast<unsigned char>(buffer[start + 1]) >= 0xA1
-        && static_cast<unsigned char>(buffer[start + 1]) <= 0xB0
-        && static_cast<unsigned char>(buffer[start + 2]) >= 0xA1
-        && static_cast<unsigned char>(buffer[start + 2]) <= 0xFE
-        && static_cast<unsigned char>(buffer[start + 3]) >= 0xA1
-        && static_cast<unsigned char>(buffer[start + 3]) <= 0xFE
-      )
-        return {start, start + 4};
-      else
-        throw_for_encoding_error("EUC_KR", buffer, start, 4);
-    }
-    else
-      throw_for_encoding_error("EUC_KR", buffer, start, 1);
+    if (not between_inc(byte2, 0xa1, 0xfe))
+      throw_for_encoding_error("EUC_KR", buffer, start, 2);
+
+    return start + 2;
   }
+
+  if (byte1 != 0x8e or start + 4 > buffer_len)
+    throw_for_encoding_error("EUC_KR", buffer, start, 1);
+
+  if (
+        between_inc(byte2, 0xa1, 0xb0) and
+        between_inc(get_byte(buffer, start + 2), 0xa1, 0xfe) and
+        between_inc(get_byte(buffer, start + 3), 0xa1, 0xfe)
+  )
+    return start + 4;
+
+  throw_for_encoding_error("EUC_KR", buffer, start, 4);
 }
 
 // https://en.wikipedia.org/wiki/GB_18030#Mapping
-template<> seq_position next_seq<encoding_group::GB18030>(
-  const char* buffer,
+template<> std::string::size_type glyph_scanner<encoding_group::GB18030>::call(
+  const char buffer[],
   std::string::size_type buffer_len,
   std::string::size_type start
 )
 {
-  if (start >= buffer_len)
-    return {std::string::npos, std::string::npos};
-  else if (
-       static_cast<unsigned char>(buffer[start]) <= 0x80
-    || static_cast<unsigned char>(buffer[start]) == 0xFF
-  )
-    return {start, start + 1};
-  else
+  if (start >= buffer_len) return std::string::npos;
+
+  const auto byte1 = get_byte(buffer, start);
+  if (between_inc(byte1, 0x80, 0xff)) return start + 1;
+
+  if (start + 2 > buffer_len)
+    throw_for_encoding_error("GB18030", buffer, start, buffer_len - start);
+
+  const auto byte2 = get_byte(buffer, start + 1);
+  if (between_inc(byte2, 0x40, 0xfe))
   {
-    if (
-         start + 2 <= buffer_len
-      && static_cast<unsigned char>(buffer[start + 1]) >= 0x40
-      && static_cast<unsigned char>(buffer[start + 1]) <= 0xFE
-    )
-    {
-      if (static_cast<unsigned char>(buffer[start + 1]) != 0x7F)
-        return {start, start + 2};
-      else
-        throw_for_encoding_error("GB18030", buffer, start, 2);
-    }
-    else
-    {
-      if (start + 4 <= buffer_len)
-      {
-        if (
-             static_cast<unsigned char>(buffer[start + 1]) >= 0x30
-          && static_cast<unsigned char>(buffer[start + 1]) <= 0x39
-          && static_cast<unsigned char>(buffer[start + 2]) >= 0x81
-          && static_cast<unsigned char>(buffer[start + 2]) <= 0xFE
-          && static_cast<unsigned char>(buffer[start + 3]) >= 0x30
-          && static_cast<unsigned char>(buffer[start + 3]) <= 0x39
-        )
-          return {start, start + 4};
-        else
-          throw_for_encoding_error("GB18030", buffer, start, 4);
-      }
-      else
-        throw_for_encoding_error(
-          "GB18030",
-          buffer,
-          start,
-          buffer_len - start
-        );
-    }
+    if (byte2 == 0x7f)
+      throw_for_encoding_error("GB18030", buffer, start, 2);
+
+    return start + 2;
   }
+
+  if (start + 4 > buffer_len)
+    throw_for_encoding_error("GB18030", buffer, start, buffer_len - start);
+
+  if (
+	between_inc(byte2, 0x30, 0x39) and
+	between_inc(get_byte(buffer, start + 2), 0x81, 0xfe) and
+	between_inc(get_byte(buffer, start + 3), 0x30, 0x39)
+  )
+    return start + 4;
+
+  throw_for_encoding_error("GB18030", buffer, start, 4);
 }
 
 // https://en.wikipedia.org/wiki/GBK_(character_encoding)#Encoding
-template<> seq_position next_seq<encoding_group::GBK>(
-  const char* buffer,
+template<> std::string::size_type glyph_scanner<encoding_group::GBK>::call(
+  const char buffer[],
   std::string::size_type buffer_len,
   std::string::size_type start
 )
 {
-  if (start >= buffer_len)
-    return {std::string::npos, std::string::npos};
-  else if (static_cast<unsigned char>(buffer[start]) < 0x80)
-    return {start, start + 1};
-  else
-  {
-    if (start + 2 <= buffer_len)
-    {
-      if ((
-           static_cast<unsigned char>(buffer[start    ]) >= 0xA1
-        && static_cast<unsigned char>(buffer[start    ]) <= 0xA9
-        && static_cast<unsigned char>(buffer[start + 1]) >= 0xA1
-        && static_cast<unsigned char>(buffer[start + 1]) <= 0xFE
-      ) || (
-           static_cast<unsigned char>(buffer[start    ]) >= 0xB0
-        && static_cast<unsigned char>(buffer[start    ]) <= 0xF7
-        && static_cast<unsigned char>(buffer[start + 1]) >= 0xA1
-        && static_cast<unsigned char>(buffer[start + 1]) <= 0xFE
-      ) || (
-           static_cast<unsigned char>(buffer[start    ]) >= 0x81
-        && static_cast<unsigned char>(buffer[start    ]) <= 0xA0
-        && static_cast<unsigned char>(buffer[start + 1]) >= 0x40
-        && static_cast<unsigned char>(buffer[start + 1]) <= 0xFE
-        && static_cast<unsigned char>(buffer[start + 1]) != 0x7F
-      ) || (
-           static_cast<unsigned char>(buffer[start    ]) >= 0xAA
-        && static_cast<unsigned char>(buffer[start    ]) <= 0xFE
-        && static_cast<unsigned char>(buffer[start + 1]) >= 0x40
-        && static_cast<unsigned char>(buffer[start + 1]) <= 0xA0
-        && static_cast<unsigned char>(buffer[start + 1]) != 0x7F
-      ) || (
-           static_cast<unsigned char>(buffer[start    ]) >= 0xA8
-        && static_cast<unsigned char>(buffer[start    ]) <= 0xA9
-        && static_cast<unsigned char>(buffer[start + 1]) >= 0x40
-        && static_cast<unsigned char>(buffer[start + 1]) <= 0xA0
-        && static_cast<unsigned char>(buffer[start + 1]) != 0x7F
-      ) || (
-           static_cast<unsigned char>(buffer[start    ]) >= 0xAA
-        && static_cast<unsigned char>(buffer[start    ]) <= 0xAF
-        && static_cast<unsigned char>(buffer[start + 1]) >= 0xA1
-        && static_cast<unsigned char>(buffer[start + 1]) <= 0xFE
-      ) || (
-           static_cast<unsigned char>(buffer[start    ]) >= 0xF8
-        && static_cast<unsigned char>(buffer[start    ]) <= 0xFE
-        && static_cast<unsigned char>(buffer[start + 1]) >= 0xA1
-        && static_cast<unsigned char>(buffer[start + 1]) <= 0xFE
-      ) || (
-           static_cast<unsigned char>(buffer[start    ]) >= 0xA1
-        && static_cast<unsigned char>(buffer[start    ]) <= 0xA7
-        && static_cast<unsigned char>(buffer[start + 1]) >= 0x40
-        && static_cast<unsigned char>(buffer[start + 1]) <= 0xA0
-        && static_cast<unsigned char>(buffer[start + 1]) != 0x7F
-      ))
-        return {start, start + 2};
-      else
-        throw_for_encoding_error("GBK", buffer, start, 2);
-    }
-    else
-      throw_for_encoding_error("GBK", buffer, start, 1);
-  }
+  if (start >= buffer_len) return std::string::npos;
+
+  const auto byte1 = get_byte(buffer, start);
+  if (byte1 < 0x80) return start + 1;
+
+  if (start + 2 > buffer_len)
+    throw_for_encoding_error("GBK", buffer, start, 1);
+
+  const auto byte2 = get_byte(buffer, start + 1);
+  if (
+    (between_inc(byte1, 0xa1, 0xa9) and between_inc(byte2, 0xa1, 0xfe))
+    or
+    (between_inc(byte1, 0xb0, 0xf7) and between_inc(byte2, 0xa1, 0xfe))
+    or
+    (
+      between_inc(byte1, 0x81, 0xa0) and
+      between_inc(byte2, 0x40, 0xfe) and
+      byte2 != 0x7f
+    )
+    or
+    (
+      between_inc(byte1, 0xaa, 0xfe) and
+      between_inc(byte2, 0x40, 0xa0) and
+      byte2 != 0x7f
+    )
+    or
+    (
+      between_inc(byte1, 0xa8, 0xa9) and
+      between_inc(byte2, 0x40, 0xa0) and
+      byte2 != 0x7f
+    )
+    or
+    (between_inc(byte1, 0xaa, 0xaf) and between_inc(byte2, 0xa1, 0xfe))
+    or
+    (between_inc(byte1, 0xf8, 0xfe) and between_inc(byte2, 0xa1, 0xfe))
+    or
+    (
+      between_inc(byte1, 0xa1, 0xa7) and
+      between_inc(byte2, 0x40, 0xa0) and
+      byte2 != 0x7f
+    )
+  )
+    return start + 2;
+
+  throw_for_encoding_error("GBK", buffer, start, 2);
 }
 
 /*
 The PostgreSQL documentation claims that the JOHAB encoding is 1-3 bytes, but
-"CJKV Information Processing" describes it (actually just the Hangul portion) as
-"three five-bit segments" that reside inside 16 bits (2 bytes).
+"CJKV Information Processing" describes it (actually just the Hangul portion)
+as "three five-bit segments" that reside inside 16 bits (2 bytes).
+
+CJKV Information Processing by Ken Lunde, pg. 269:
+
+  https://bit.ly/2BEOu5V
 */
-// CJKV Information Processing by Ken Lunde, pg. 269
-// https://books.google.com/books?id=SA92uQqTB-AC&pg=PA269&lpg=PA269&dq=JOHAB+encoding&source=bl&ots=GMvxWWl8Gx&sig=qLFQNkR4d7Rd-iqQy1lNh3oEdOE&hl=en&sa=X&ved=0ahUKEwizyoTDxePbAhWjpFkKHU65DSwQ6AEIajAH#v=onepage&q=JOHAB%20encoding&f=false
-template<> seq_position next_seq<encoding_group::JOHAB>(
-  const char* buffer,
+template<> std::string::size_type glyph_scanner<encoding_group::JOHAB>::call(
+  const char buffer[],
   std::string::size_type buffer_len,
   std::string::size_type start
 )
 {
-  if (start >= buffer_len)
-    return {std::string::npos, std::string::npos};
-  else if (static_cast<unsigned char>(buffer[start]) < 0x80)
-    return {start, start + 1};
-  else
-  {
-    if (start + 2 <= buffer_len)
-    {
-      if ((
-           static_cast<unsigned char>(buffer[start]) >= 0x84
-        && static_cast<unsigned char>(buffer[start]) <= 0xD3
-        && ((
-             static_cast<unsigned char>(buffer[start + 1]) >= 0x41
-          && static_cast<unsigned char>(buffer[start + 1]) <= 0x7E
-        ) || (
-             static_cast<unsigned char>(buffer[start + 1]) >= 0x81
-          && static_cast<unsigned char>(buffer[start + 1]) <= 0xFE
-        ))
-      ) || (
-        ((
-             static_cast<unsigned char>(buffer[start]) >= 0xD8
-          && static_cast<unsigned char>(buffer[start]) <= 0xDE
-        ) || (
-             static_cast<unsigned char>(buffer[start]) >= 0xE0
-          && static_cast<unsigned char>(buffer[start]) <= 0xF9
-        ))
-        && ((
-             static_cast<unsigned char>(buffer[start + 1]) >= 0x31
-          && static_cast<unsigned char>(buffer[start + 1]) <= 0x7E
-        ) || (
-             static_cast<unsigned char>(buffer[start + 1]) >= 0x91
-          && static_cast<unsigned char>(buffer[start + 1]) <= 0xFE
-        ))
-      ))
-        return {start, start + 2};
-      else
-        throw_for_encoding_error("JOHAB", buffer, start, 2);
-    }
-    else
-      throw_for_encoding_error("JOHAB", buffer, start, 1);
-  }
+  if (start >= buffer_len) return std::string::npos;
+
+  const auto byte1 = get_byte(buffer, start);
+  if (byte1 < 0x80) return start + 1;
+
+  if (start + 2 > buffer_len)
+    throw_for_encoding_error("JOHAB", buffer, start, 1);
+
+  const auto byte2 = get_byte(buffer, start);
+  if (
+    (
+      between_inc(byte1, 0x84, 0xd3) and
+      (between_inc(byte2, 0x41, 0x7e) or between_inc(byte2, 0x81, 0xfe))
+    )
+    or
+    (
+      (between_inc(byte1, 0xd8, 0xde) or between_inc(byte1, 0xe0, 0xf9)) and
+      (between_inc(byte2, 0x31, 0x7e) or between_inc(byte2, 0x91, 0xfe))
+    )
+  )
+    return start + 2;
+
+  throw_for_encoding_error("JOHAB", buffer, start, 2);
 }
 
 /*
@@ -576,80 +463,60 @@ This is implemented according to the description in said header file, but I was
 unable to get it to successfully iterate a MULE-encoded test CSV generated using
 PostgreSQL 9.2.23.  Use this at your own risk.
 */
-template<> seq_position next_seq<encoding_group::MULE_INTERNAL>(
-  const char* buffer,
+template<>
+std::string::size_type glyph_scanner<encoding_group::MULE_INTERNAL>::call(
+  const char buffer[],
   std::string::size_type buffer_len,
   std::string::size_type start
 )
 {
-  if (start >= buffer_len)
-    return {std::string::npos, std::string::npos};
-  else if (static_cast<unsigned char>(buffer[start]) < 0x80)
-    return {start, start + 1};
-  else
-  {
-    if (start + 2 <= buffer_len)
-    {
-      if (
-           static_cast<unsigned char>(buffer[start    ]) >= 0x81
-        && static_cast<unsigned char>(buffer[start    ]) <= 0x8D
-        && static_cast<unsigned char>(buffer[start + 1]) >= 0xA0
-        // && static_cast<unsigned char>(buffer[start + 1]) <= 0xFF
-      )
-        return {start, start + 2};
-      else if (start + 3 <= buffer_len)
-      {
-        if (((
-             static_cast<unsigned char>(buffer[start    ]) == 0x9A
-          && static_cast<unsigned char>(buffer[start + 1]) >= 0xA0
-          && static_cast<unsigned char>(buffer[start + 1]) <= 0xDF
-        ) || (
-             static_cast<unsigned char>(buffer[start    ]) == 0x9B
-          && static_cast<unsigned char>(buffer[start + 1]) >= 0xE0
-          && static_cast<unsigned char>(buffer[start + 1]) <= 0xEF
-        ) || (
-             static_cast<unsigned char>(buffer[start    ]) >= 0x90
-          && static_cast<unsigned char>(buffer[start    ]) <= 0x99
-          && static_cast<unsigned char>(buffer[start + 1]) >= 0xA0
-          // && static_cast<unsigned char>(buffer[start + 1]) <= 0xFF
-        )) && (
-             static_cast<unsigned char>(buffer[start + 2]) >= 0xA0
-          // && static_cast<unsigned char>(buffer[start + 2]) <= 0xFF
-        ))
-          return {start, start + 3};
-        else if (start + 4 <= buffer_len)
-        {
-          if (((
-               static_cast<unsigned char>(buffer[start    ]) == 0x9C
-            && static_cast<unsigned char>(buffer[start + 1]) >= 0xF0
-            && static_cast<unsigned char>(buffer[start + 1]) <= 0xF4
-          ) || (
-               static_cast<unsigned char>(buffer[start    ]) == 0x9D
-            && static_cast<unsigned char>(buffer[start + 1]) >= 0xF5
-            && static_cast<unsigned char>(buffer[start + 1]) <= 0xFE
-          )) && (
-               static_cast<unsigned char>(buffer[start + 2]) >= 0xA0
-            // && static_cast<unsigned char>(buffer[start + 2]) <= 0xFF
-            && static_cast<unsigned char>(buffer[start + 4]) >= 0xA0
-            // && static_cast<unsigned char>(buffer[start + 4]) <= 0xFF
-          ))
-            return {start, start + 4};
-          else
-            throw_for_encoding_error("MULE_INTERNAL", buffer, start, 4);
-        }
-        else
-          throw_for_encoding_error("MULE_INTERNAL", buffer, start, 3);
-      }
-      else
-        throw_for_encoding_error("MULE_INTERNAL", buffer, start, 2);
-    }
-    else
-      throw_for_encoding_error("MULE_INTERNAL", buffer, start, 1);
-  }
+  if (start >= buffer_len) return std::string::npos;
+
+  const auto byte1 = get_byte(buffer, start);
+  if (byte1 < 0x80) return start + 1;
+
+  if (start + 2 > buffer_len)
+    throw_for_encoding_error("MULE_INTERNAL", buffer, start, 1);
+
+  const auto byte2 = get_byte(buffer, start + 1);
+  if (between_inc(byte1, 0x81, 0x8d) and byte2 >= 0xA0)
+    return start + 2;
+
+  if (start + 3 > buffer_len)
+    throw_for_encoding_error("MULE_INTERNAL", buffer, start, 2);
+
+  if (
+    (
+      (byte1 == 0x9A and between_inc(byte2, 0xa0, 0xdf)) or
+      (byte1 == 0x9B and between_inc(byte2, 0xe0, 0xef)) or
+      (between_inc(byte1, 0x90, 0x99) and byte2 >= 0xa0)
+    )
+    and
+    (
+      byte2 >= 0xA0
+    )
+  )
+    return start + 3;
+
+  if (start + 4 > buffer_len)
+    throw_for_encoding_error("MULE_INTERNAL", buffer, start, 3);
+
+  if (
+    (
+      (byte1 == 0x9C and between_inc(byte2, 0xf0, 0xf4)) or
+      (byte1 == 0x9D and between_inc(byte2, 0xf5, 0xfe))
+    )
+    and
+    get_byte(buffer, start + 2) >= 0xa0 and
+    get_byte(buffer, start + 4) >= 0xa0
+  )
+    return start + 4;
+
+  throw_for_encoding_error("MULE_INTERNAL", buffer, start, 4);
 }
 
-template<> seq_position next_seq<encoding_group::SJIS>(
-  const char* buffer,
+template<> std::string::size_type glyph_scanner<encoding_group::SJIS>::call(
+  const char buffer[],
   std::string::size_type buffer_len,
   std::string::size_type start
 )
@@ -657,8 +524,9 @@ template<> seq_position next_seq<encoding_group::SJIS>(
   return next_seq_for_sjislike(buffer, buffer_len, start, "SJIS");
 }
 
-template<> seq_position next_seq<encoding_group::SHIFT_JIS_2004>(
-  const char* buffer,
+template<>
+std::string::size_type glyph_scanner<encoding_group::SHIFT_JIS_2004>::call(
+  const char buffer[],
   std::string::size_type buffer_len,
   std::string::size_type start
 )
@@ -667,181 +535,110 @@ template<> seq_position next_seq<encoding_group::SHIFT_JIS_2004>(
 }
 
 // https://en.wikipedia.org/wiki/Unified_Hangul_Code
-template<> seq_position next_seq<encoding_group::UHC>(
-  const char* buffer,
+template<> std::string::size_type glyph_scanner<encoding_group::UHC>::call(
+  const char buffer[],
   std::string::size_type buffer_len,
   std::string::size_type start
 )
 {
-  if (start >= buffer_len)
-    return {std::string::npos, std::string::npos};
-  else if (static_cast<unsigned char>(buffer[start]) < 0x80)
-    return {start, start + 1};
-  else
+  if (start >= buffer_len) return std::string::npos;
+
+  const auto byte1 = get_byte(buffer, start);
+  if (byte1 < 0x80) return start + 1;
+
+  if (start + 2 > buffer_len)
+    throw_for_encoding_error("UHC", buffer, start, buffer_len - start);
+
+  const auto byte2 = get_byte(buffer, start + 1);
+  if (between_inc(byte1, 0x80, 0xc6))
   {
     if (
-         static_cast<unsigned char>(buffer[start]) >= 0x80
-      && static_cast<unsigned char>(buffer[start]) <= 0xC6
+      between_inc(byte2, 0x41, 0x5a) or
+      between_inc(byte2, 0x61, 0x7a) or
+      between_inc(byte2, 0x80, 0xfe)
     )
-    {
-      if (start + 2 <= buffer_len)
-      {
-        if ((
-             static_cast<unsigned char>(buffer[start + 1]) >= 0x41
-          && static_cast<unsigned char>(buffer[start + 1]) <= 0x5A
-        ) || (
-             static_cast<unsigned char>(buffer[start + 1]) >= 0x61
-          && static_cast<unsigned char>(buffer[start + 1]) <= 0x7A
-        ) || (
-             static_cast<unsigned char>(buffer[start + 1]) >= 0x80
-          && static_cast<unsigned char>(buffer[start + 1]) <= 0xFE
-        ))
-          return {start, start + 2};
-        else
-          throw_for_encoding_error("UHC", buffer, start, 2);
-      }
-      else
-        throw_for_encoding_error(
-          "UHC",
-          buffer,
-          start,
-          buffer_len - start
-        );
-    }
-    else if (
-         static_cast<unsigned char>(buffer[start]) >= 0xA1
-      && static_cast<unsigned char>(buffer[start]) <= 0xFE
-    )
-    {
-      if (start + 2 <= buffer_len)
-      {
-        if (
-             static_cast<unsigned char>(buffer[start + 1]) >= 0xA1
-          && static_cast<unsigned char>(buffer[start + 1]) <= 0xFE
-        )
-          return {start, start + 2};
-        else
-          throw_for_encoding_error("UHC", buffer, start, 2);
-      }
-      else
-        throw_for_encoding_error(
-          "UHC",
-          buffer,
-          start,
-          buffer_len - start
-        );
-    }
-    else
-      throw_for_encoding_error("UHC", buffer, start, 1);
+      return start + 2;
+
+    throw_for_encoding_error("UHC", buffer, start, 2);
   }
+
+  if (between_inc(byte1, 0xa1, 0xfe))
+  {
+    if (not between_inc(byte2, 0xa1, 0xfe))
+      throw_for_encoding_error("UHC", buffer, start, 2);
+
+   return start + 2;
+  }
+
+  throw_for_encoding_error("UHC", buffer, start, 1);
 }
 
 // https://en.wikipedia.org/wiki/UTF-8#Description
-template<> seq_position next_seq<encoding_group::UTF8>(
-  const char* buffer,
+template<> std::string::size_type glyph_scanner<encoding_group::UTF8>::call(
+  const char buffer[],
   std::string::size_type buffer_len,
   std::string::size_type start
 )
 {
-  if (start >= buffer_len)
-    return {std::string::npos, std::string::npos};
-  else if (static_cast<unsigned char>(buffer[start]) < 0x80)
-    return {start, start + 1};
-  else
+  if (start >= buffer_len) return std::string::npos;
+
+  const auto byte1 = get_byte(buffer, start);
+  if (byte1 < 0x80) return start + 1;
+
+  if (start + 2 > buffer_len)
+      throw_for_encoding_error("UTF8", buffer, start, buffer_len - start);
+
+  const auto byte2 = get_byte(buffer, start + 1);
+  if (between_inc(byte1, 0xc0, 0xdf))
+  {
+    if (not between_inc(byte2, 0x80, 0xbf))
+      throw_for_encoding_error("UTF8", buffer, start, 2);
+
+    return start + 2;
+  }
+
+  if (start + 3 > buffer_len)
+      throw_for_encoding_error("UTF8", buffer, start, buffer_len - start);
+
+  const auto byte3 = get_byte(buffer, start + 2);
+  if (between_inc(byte1, 0xe0, 0xef))
+  {
+    if (between_inc(byte2, 0x80, 0xbf) and between_inc(byte3, 0x80, 0xbf))
+      return start + 3;
+
+    throw_for_encoding_error("UTF8", buffer, start, 3);
+  }
+
+  if (start + 4 > buffer_len)
+      throw_for_encoding_error("UTF8", buffer, start, buffer_len - start);
+
+  if (between_inc(byte1, 0xf0, 0xf7))
   {
     if (
-         static_cast<unsigned char>(buffer[start]) >= 0xC0
-      && static_cast<unsigned char>(buffer[start]) <= 0xDF
+      between_inc(byte2, 0x80, 0xbf) and
+      between_inc(byte3, 0x80, 0xbf) and
+      between_inc(get_byte(buffer, start + 3), 0x80, 0xbf)
     )
-    {
-      if (start + 2 <= buffer_len)
-      {
-        if (
-             static_cast<unsigned char>(buffer[start + 1]) >= 0x80
-          && static_cast<unsigned char>(buffer[start + 1]) <= 0xBF
-        )
-          return {start, start + 2};
-        else
-          throw_for_encoding_error("UTF8", buffer, start, 2);
-      }
-      else
-        throw_for_encoding_error(
-          "UTF8",
-          buffer,
-          start,
-          buffer_len - start
-        );
-    }
-    else if (
-         static_cast<unsigned char>(buffer[start]) >= 0xE0
-      && static_cast<unsigned char>(buffer[start]) <= 0xEF
-    )
-    {
-      if (start + 3 <= buffer_len)
-      {
-        if (
-             static_cast<unsigned char>(buffer[start + 1]) >= 0x80
-          && static_cast<unsigned char>(buffer[start + 1]) <= 0xBF
-          && static_cast<unsigned char>(buffer[start + 2]) >= 0x80
-          && static_cast<unsigned char>(buffer[start + 2]) <= 0xBF
-        )
-          return {start, start + 3};
-        else
-          throw_for_encoding_error("UTF8", buffer, start, 3);
-      }
-      else
-        throw_for_encoding_error(
-          "UTF8",
-          buffer,
-          start,
-          buffer_len - start
-        );
-    }
-    else if (
-         static_cast<unsigned char>(buffer[start]) >= 0xF0
-      && static_cast<unsigned char>(buffer[start]) <= 0xF7
-    )
-    {
-      if (start + 4 <= buffer_len)
-      {
-        if (
-             static_cast<unsigned char>(buffer[start + 1]) >= 0x80
-          && static_cast<unsigned char>(buffer[start + 1]) <= 0xBF
-          && static_cast<unsigned char>(buffer[start + 2]) >= 0x80
-          && static_cast<unsigned char>(buffer[start + 2]) <= 0xBF
-          && static_cast<unsigned char>(buffer[start + 3]) >= 0x80
-          && static_cast<unsigned char>(buffer[start + 3]) <= 0xBF
-        )
-          return {start, start + 4};
-        else
-          throw_for_encoding_error("UTF8", buffer, start, 4);
-      }
-      else
-        throw_for_encoding_error(
-          "UTF8",
-          buffer,
-          start,
-          buffer_len - start
-        );
-    }
-    else
-      throw_for_encoding_error("UTF8", buffer, start, 1);
+      return start + 4;
+
+    throw_for_encoding_error("UTF8", buffer, start, 4);
   }
+
+  throw_for_encoding_error("UTF8", buffer, start, 1);
 }
 
-} // namespace pqxx::internal
-} // namespace pqxx
 
+const char *name_encoding(int encoding_id)
+{
+  return pg_encoding_to_char(encoding_id);
+}
 
-namespace pqxx
-{
-namespace internal
-{
 
 encoding_group enc_group(int libpq_enc_id)
 {
-  return enc_group(pg_encoding_to_char(libpq_enc_id));
+  return enc_group(name_encoding(libpq_enc_id));
 }
+
 
 encoding_group enc_group(const std::string& encoding_name)
 {
@@ -898,72 +695,129 @@ encoding_group enc_group(const std::string& encoding_name)
   return found_encoding_group->second;
 }
 
-// Utility macro for implementing rutime-switched versions of templated encoding
-// functions
-#define DISPATCH_ENCODING_OPERATION(ENC, FUNCTION, ...) \
-switch (ENC) \
-{ \
-case encoding_group::MONOBYTE: \
-  return FUNCTION<encoding_group::MONOBYTE>(__VA_ARGS__); \
-case encoding_group::BIG5: \
-  return FUNCTION<encoding_group::BIG5>(__VA_ARGS__); \
-case encoding_group::EUC_CN: \
-  return FUNCTION<encoding_group::EUC_CN>(__VA_ARGS__); \
-case encoding_group::EUC_JP: \
-  return FUNCTION<encoding_group::EUC_JP>(__VA_ARGS__); \
-case encoding_group::EUC_JIS_2004: \
-  return FUNCTION<encoding_group::EUC_JIS_2004>(__VA_ARGS__); \
-case encoding_group::EUC_KR: \
-  return FUNCTION<encoding_group::EUC_KR>(__VA_ARGS__); \
-case encoding_group::EUC_TW: \
-  return FUNCTION<encoding_group::EUC_TW>(__VA_ARGS__); \
-case encoding_group::GB18030: \
-  return FUNCTION<encoding_group::GB18030>(__VA_ARGS__); \
-case encoding_group::GBK: \
-  return FUNCTION<encoding_group::GBK>(__VA_ARGS__); \
-case encoding_group::JOHAB: \
-  return FUNCTION<encoding_group::JOHAB>(__VA_ARGS__); \
-case encoding_group::MULE_INTERNAL: \
-  return FUNCTION<encoding_group::MULE_INTERNAL>(__VA_ARGS__); \
-case encoding_group::SJIS: \
-  return FUNCTION<encoding_group::SJIS>(__VA_ARGS__); \
-case encoding_group::SHIFT_JIS_2004: \
-  return FUNCTION<encoding_group::SHIFT_JIS_2004>(__VA_ARGS__); \
-case encoding_group::UHC: \
-  return FUNCTION<encoding_group::UHC>(__VA_ARGS__); \
-case encoding_group::UTF8: \
-  return FUNCTION<encoding_group::UTF8>(__VA_ARGS__); \
-} \
-throw pqxx::usage_error("Invalid encoding group code.")
 
-seq_position next_seq(
-  encoding_group enc,
-  const char* buffer,
-  std::string::size_type buffer_len,
-  std::string::size_type start
-)
+/// Look up instantiation @c T<enc>::call at runtime.
+/** Here, "T" is a struct template with a static member function "call", whose
+ * type is "F".
+ *
+ * The return value is a pointer to the "call" member function for the
+ * instantiation of T for encoding group enc.
+ */
+template<template<encoding_group> class T, typename F>
+inline F *for_encoding(encoding_group enc)
 {
-  DISPATCH_ENCODING_OPERATION(enc, next_seq, buffer, buffer_len, start);
+
+#define CASE_GROUP(ENC) \
+	case encoding_group::ENC: return T<encoding_group::ENC>::call
+
+  switch (enc)
+  {
+  CASE_GROUP(MONOBYTE);
+  CASE_GROUP(BIG5);
+  CASE_GROUP(EUC_CN);
+  CASE_GROUP(EUC_JP);
+  CASE_GROUP(EUC_JIS_2004);
+  CASE_GROUP(EUC_KR);
+  CASE_GROUP(EUC_TW);
+  CASE_GROUP(GB18030);
+  CASE_GROUP(GBK);
+  CASE_GROUP(JOHAB);
+  CASE_GROUP(MULE_INTERNAL);
+  CASE_GROUP(SJIS);
+  CASE_GROUP(SHIFT_JIS_2004);
+  CASE_GROUP(UHC);
+  CASE_GROUP(UTF8);
+  }
+  throw pqxx::usage_error{
+	"Unsupported encoding group code " + to_string(int(enc)) + "."};
+
+#undef CASE_GROUP
 }
 
-std::string::size_type find_with_encoding(
-  encoding_group enc,
-  const std::string& haystack,
-  char needle,
-  std::string::size_type start
-)
+
+glyph_scanner_func *get_glyph_scanner(encoding_group enc)
 {
-  DISPATCH_ENCODING_OPERATION(enc, find_with_encoding, haystack, needle, start);
+  return for_encoding<glyph_scanner, glyph_scanner_func>(enc);
 }
 
+
+template<encoding_group E> struct char_finder
+{
+  static std::string::size_type call(
+	const std::string &haystack,
+	char needle,
+	std::string::size_type start)
+  {
+    const auto buffer = haystack.c_str();
+    const auto size = haystack.size();
+    for (
+	auto here = start;
+	here + 1 <= size;
+	here = glyph_scanner<E>::call(buffer, size, here)
+    )
+    {
+      if (haystack[here] == needle) return here;
+    }
+    return std::string::npos;
+  }
+};
+
+
+template<encoding_group E> struct string_finder
+{
+  static std::string::size_type call(
+	const std::string &haystack,
+	const std::string &needle,
+	std::string::size_type start)
+  {
+    const auto buffer = haystack.c_str();
+    const auto size = haystack.size();
+    const auto needle_size = needle.size();
+    for (
+	auto here = start;
+	here + needle_size <= size;
+	here = glyph_scanner<E>::call(buffer, size, here)
+    )
+    {
+      if (std::memcmp(buffer + here, needle.c_str(), needle_size) == 0)
+        return here;
+    }
+    return std::string::npos;
+  }
+};
+
+
 std::string::size_type find_with_encoding(
-  encoding_group enc,
-  const std::string& haystack,
-  const std::string& needle,
-  std::string::size_type start
+	encoding_group enc,
+	const std::string& haystack,
+	char needle,
+	std::string::size_type start
 )
 {
-  DISPATCH_ENCODING_OPERATION(enc, find_with_encoding, haystack, needle, start);
+  using finder_func =
+    std::string::size_type(
+	const std::string &haystack,
+	char needle,
+	std::string::size_type start);
+  const auto finder = for_encoding<char_finder, finder_func>(enc);
+  return finder(haystack, needle, start);
+}
+
+
+std::string::size_type find_with_encoding(
+	encoding_group enc,
+	const std::string& haystack,
+	const std::string& needle,
+	std::string::size_type start
+)
+{
+  using finder_func =
+    std::string::size_type(
+	const std::string &haystack,
+	const std::string &needle,
+	std::string::size_type start);
+  const auto finder = for_encoding<string_finder, finder_func>(enc);
+  return finder(haystack, needle, start);
 }
 
 #undef DISPATCH_ENCODING_OPERATION

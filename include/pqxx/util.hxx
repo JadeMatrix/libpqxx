@@ -37,6 +37,7 @@ namespace pqxx
 /// Suppress compiler warning about an unused item.
 template<typename T> inline void ignore_unused(T) {}
 
+
 /// Descriptor of library's thread-safety model.
 /** This describes what the library knows about various risks to thread-safety.
  */
@@ -128,26 +129,31 @@ separated_list(const std::string &sep, ITER begin, ITER end)		//[t00]
 template<typename CONTAINER> inline auto
 separated_list(const std::string &sep, const CONTAINER &c)		//[t10]
 	/*
-	Always std::string; necessary because SFINAE doesn't work with the contents
-	of function bodies, so the check for iterability has to be in the signature
+	Always std::string; necessary because SFINAE doesn't work with the
+	contents of function bodies, so the check for iterability has to be in
+	the signature.
 	*/
 	-> typename std::enable_if<
 		(
-			!std::is_void<decltype(std::begin(c))>::value
-			&& !std::is_void<decltype(std::end(c))>::value
+			not std::is_void<decltype(std::begin(c))>::value
+			and not std::is_void<decltype(std::end(c))>::value
 		),
 		std::string
 	>::type
-	{ return separated_list(sep, std::begin(c), std::end(c)); }
+{
+  return separated_list(sep, std::begin(c), std::end(c));
+}
 
 
 namespace internal
 {
 struct passthrough_access
 {
-	template<typename T> constexpr auto operator()( T t_p ) const
-		-> decltype( *t_p )
-		{ return *t_p; }
+  template<typename T> constexpr auto operator()( T t_p ) const
+	-> decltype( *t_p )
+  {
+    return *t_p;
+  }
 };
 }
 
@@ -160,12 +166,16 @@ template<
 		(INDEX == std::tuple_size<TUPLE>::value-1),
 		int
 	>::type=0
-> inline std::string
+>
+inline std::string
 separated_list(
 	const std::string & /* sep */,
 	const TUPLE &t,
 	const ACCESS& access
-) { return to_string(access(&std::get<INDEX>(t))); }
+)
+{
+  return to_string(access(&std::get<INDEX>(t)));
+}
 
 template<
 	typename TUPLE,
@@ -175,12 +185,14 @@ template<
 		(INDEX < std::tuple_size<TUPLE>::value-1),
 		int
 	>::type=0
-> inline std::string
+>
+inline std::string
 separated_list(const std::string &sep, const TUPLE &t, const ACCESS& access)
 {
-	return to_string(access(&std::get<INDEX>(t)))
-		+ sep
-		+ separated_list<TUPLE, INDEX+1>(sep, t, access);
+  return
+	to_string(access(&std::get<INDEX>(t))) +
+	sep +
+	separated_list<TUPLE, INDEX+1>(sep, t, access);
 }
 
 template<
@@ -190,9 +202,12 @@ template<
 		(INDEX <= std::tuple_size<TUPLE>::value),
 		int
 	>::type=0
-> inline std::string
+>
+inline std::string
 separated_list(const std::string &sep, const TUPLE &t)
-	{ return separated_list(sep, t, internal::passthrough_access{}); }
+{
+  return separated_list(sep, t, internal::passthrough_access{});
+}
 //@}
 
 
@@ -238,14 +253,14 @@ class PQXX_LIBEXPORT namedclass
 {
 public:
   explicit namedclass(const std::string &Classname) :
-    m_classname(Classname),
-    m_name()
+    m_classname{Classname},
+    m_name{}
   {
   }
 
   namedclass(const std::string &Classname, const std::string &Name) :
-    m_classname(Classname),
-    m_name(Name)
+    m_classname{Classname},
+    m_name{Name}
   {
   }
 

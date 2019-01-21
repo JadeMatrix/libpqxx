@@ -5,10 +5,13 @@ using namespace pqxx;
 
 namespace
 {
-void test_stateless_cursor(transaction_base &trans)
+void test_stateless_cursor()
 {
+  connection conn;
+  work tx{conn};
+
   stateless_cursor<cursor_base::read_only, cursor_base::owned> empty(
-	trans,
+	tx,
 	"SELECT generate_series(0, -1)",
 	"empty",
 	false);
@@ -26,7 +29,7 @@ void test_stateless_cursor(transaction_base &trans)
     "Empty cursor tries to retrieve");
 
   stateless_cursor<cursor_base::read_only, cursor_base::owned> stateless(
-	trans,
+	tx,
 	"SELECT generate_series(0, 9)",
 	"stateless",
 	false);
@@ -80,8 +83,8 @@ void test_stateless_cursor(transaction_base &trans)
   PQXX_CHECK_EQUAL(rows.size(), 2u, "Wrong batch size");
   PQXX_CHECK_EQUAL(rows[0][0].as<int>(), 8, "Batch in wrong place");
   PQXX_CHECK_EQUAL(rows[1][0].as<int>(), 9, "Batch in wrong place");
-
 }
-} // namespace
 
-PQXX_REGISTER_TEST(test_stateless_cursor)
+
+PQXX_REGISTER_TEST(test_stateless_cursor);
+} // namespace

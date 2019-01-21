@@ -9,7 +9,7 @@
 # The template2mak.py script should be available in the tools directory of the
 # libpqxx source archive.
 #
-# Generated from template 'test/Makefile.am.template'.
+# Generated from template './test/Makefile.am.template'.
 ################################################################################
 # Makefile.am is generated automatically for automake whenever test programs are
 # added to libpqxx.
@@ -99,7 +99,6 @@ runner_SOURCES = \
   test78.cxx \
   test79.cxx \
   test82.cxx \
-  test83.cxx \
   test84.cxx \
   test86.cxx \
   test87.cxx \
@@ -108,7 +107,6 @@ runner_SOURCES = \
   test90.cxx \
   test92.cxx \
   test93.cxx \
-  test94.cxx \
   runner.cxx
 
 runner_LDADD = $(top_builddir)/src/libpqxx.la ${POSTGRES_LIB}

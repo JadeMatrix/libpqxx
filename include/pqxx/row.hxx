@@ -4,7 +4,7 @@
  *
  * DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/result instead.
  *
- * Copyright (c) 2001-2018, Jeroen T. Vermeulen.
+ * Copyright (c) 2001-2019, Jeroen T. Vermeulen.
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -62,7 +62,7 @@ public:
   //@{
   PQXX_PURE bool operator==(const row &) const noexcept;		//[t75]
   bool operator!=(const row &rhs) const noexcept			//[t75]
-      { return !operator==(rhs); }
+      { return not operator==(rhs); }
   //@}
 
   const_iterator begin() const noexcept;				//[t82]
@@ -204,35 +204,26 @@ protected:
 
 
 /// Iterator for fields in a row.  Use as row::const_iterator.
-class PQXX_LIBEXPORT const_row_iterator :
-  public std::iterator<
-	std::random_access_iterator_tag,
-	const field,
-	row_size_type
-	>,
-  public field
+class PQXX_LIBEXPORT const_row_iterator : public field
 {
-  using it = std::iterator<
-	std::random_access_iterator_tag,
-	const field,
-	row_size_type
-	>;
 public:
-  using it::pointer;
+  using iterator_category = std::random_access_iterator_tag;
+  using value_type = const field;
+  using pointer = const field *;
   using size_type = row_size_type;
   using difference_type = row_difference_type;
   using reference = field;
 
   const_row_iterator(const row &T, row_size_type C) noexcept :		//[t82]
-    field(T, C) {}
-  const_row_iterator(const field &F) noexcept : field(F) {}		//[t82]
+    field{T, C} {}
+  const_row_iterator(const field &F) noexcept : field{F} {}		//[t82]
 
   /**
    * @name Dereferencing operators
    */
   //@{
   pointer operator->() const { return this; }				//[t82]
-  reference operator*() const { return field(*this); }			//[t82]
+  reference operator*() const { return field{*this}; }			//[t82]
   //@}
 
   /**
@@ -297,10 +288,10 @@ public:
   using reference = iterator_type::reference;
 
   const_reverse_row_iterator(const const_reverse_row_iterator &r) :	//[t82]
-    const_row_iterator(r) {}
+    const_row_iterator{r} {}
   explicit
     const_reverse_row_iterator(const super &rhs) noexcept :		//[t82]
-      const_row_iterator(rhs) { super::operator--(); }
+      const_row_iterator{rhs} { super::operator--(); }
 
   PQXX_PURE iterator_type base() const noexcept;			//[t82]
 
@@ -336,9 +327,9 @@ public:
    */
   //@{
   const_reverse_row_iterator operator+(difference_type i) const		//[t82]
-      { return const_reverse_row_iterator(base()-i); }
+      { return const_reverse_row_iterator{base()-i}; }
   const_reverse_row_iterator operator-(difference_type i)		//[t82]
-      { return const_reverse_row_iterator(base()+i); }
+      { return const_reverse_row_iterator{base()+i}; }
   difference_type
     operator-(const const_reverse_row_iterator &rhs) const		//[t82]
       { return rhs.const_row_iterator::operator-(*this); }
@@ -368,9 +359,9 @@ public:
 inline const_row_iterator
 const_row_iterator::operator+(difference_type o) const
 {
-  return const_row_iterator(
+  return const_row_iterator{
 	row(home(), idx()),
-	size_type(difference_type(col()) + o));
+	size_type(difference_type(col()) + o)};
 }
 
 inline const_row_iterator
@@ -380,9 +371,9 @@ operator+(const_row_iterator::difference_type o, const_row_iterator i)
 inline const_row_iterator
 const_row_iterator::operator-(difference_type o) const
 {
-  return const_row_iterator(
+  return const_row_iterator{
 	row(home(), idx()),
-	size_type(difference_type(col()) - o));
+	size_type(difference_type(col()) - o)};
 }
 
 inline const_row_iterator::difference_type

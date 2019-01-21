@@ -9,7 +9,7 @@
 # The template2mak.py script should be available in the tools directory of the
 # libpqxx source archive.
 #
-# Generated from template 'win32/vc-test-unit.mak.template'.
+# Generated from template './win32/vc-test-unit.mak.template'.
 ################################################################################
 # Visual C++ Makefile for libpqxx unit tests
 # This file was written by Sam Kapilivsky, based on Bart Samwel's original.
@@ -83,6 +83,7 @@ OBJS= \
   $(INTDIR)\test_array.obj \
   $(INTDIR)\test_binarystring.obj \
   $(INTDIR)\test_cancel_query.obj \
+  $(INTDIR)\test_cursor.obj \
   $(INTDIR)\test_error_verbosity.obj \
   $(INTDIR)\test_errorhandler.obj \
   $(INTDIR)\test_escape.obj \
@@ -147,6 +148,8 @@ $(INTDIR)\test_binarystring.obj:
 	@$(CXX) $(CXX_FLAGS) test/unit/test_binarystring.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
 $(INTDIR)\test_cancel_query.obj:
 	@$(CXX) $(CXX_FLAGS) test/unit/test_cancel_query.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
+$(INTDIR)\test_cursor.obj:
+	@$(CXX) $(CXX_FLAGS) test/unit/test_cursor.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
 $(INTDIR)\test_error_verbosity.obj:
 	@$(CXX) $(CXX_FLAGS) test/unit/test_error_verbosity.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
 $(INTDIR)\test_errorhandler.obj:

@@ -1,100 +1,95 @@
-/* include/pqxx/config.h.in.  Generated from configure.ac by autoheader.  */
-
 /* most gcc compilers know a function __attribute__((__const__)) */
-#undef GCC_CONST_CALL
+#cmakedefine GCC_CONST_CALL
 
 /* define if the compiler supports basic C++11 syntax */
-#undef HAVE_CXX11
+#cmakedefine HAVE_CXX11
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
-#undef HAVE_DLFCN_H
+#cmakedefine HAVE_DLFCN_H
 
 /* Define to 1 if you have the <inttypes.h> header file. */
-#undef HAVE_INTTYPES_H
+#cmakedefine HAVE_INTTYPES_H
 
 /* Define to 1 if you have the `pq' library (-lpq). */
-#undef HAVE_LIBPQ
+#cmakedefine HAVE_LIBPQ
 
 /* Define to 1 if you have the <memory.h> header file. */
-#undef HAVE_MEMORY_H
+#cmakedefine HAVE_MEMORY_H
 
 /* System supports poll(). */
-#undef HAVE_POLL
+#cmakedefine HAVE_POLL
 
 /* Define to 1 if you have the <stdint.h> header file. */
-#undef HAVE_STDINT_H
+#cmakedefine HAVE_STDINT_H
 
 /* Define to 1 if you have the <stdlib.h> header file. */
-#undef HAVE_STDLIB_H
+#cmakedefine HAVE_STDLIB_H
 
 /* Define to 1 if you have the <strings.h> header file. */
-#undef HAVE_STRINGS_H
+#cmakedefine HAVE_STRINGS_H
 
 /* Define to 1 if you have the <string.h> header file. */
-#undef HAVE_STRING_H
+#cmakedefine HAVE_STRING_H
 
 /* Define to 1 if you have the <sys/select.h> header file. */
-#undef HAVE_SYS_SELECT_H
+#cmakedefine HAVE_SYS_SELECT_H
 
 /* Define to 1 if you have the <sys/stat.h> header file. */
-#undef HAVE_SYS_STAT_H
+#cmakedefine HAVE_SYS_STAT_H
 
 /* Define to 1 if you have the <sys/time.h> header file. */
-#undef HAVE_SYS_TIME_H
+#cmakedefine HAVE_SYS_TIME_H
 
 /* Define to 1 if you have the <sys/types.h> header file. */
-#undef HAVE_SYS_TYPES_H
+#cmakedefine HAVE_SYS_TYPES_H
 
 /* Define to 1 if you have the <unistd.h> header file. */
-#undef HAVE_UNISTD_H
+#cmakedefine HAVE_UNISTD_H
 
 /* Define to the sub-directory where libtool stores uninstalled libraries. */
-#undef LT_OBJDIR
+#cmakedefine LT_OBJDIR
 
 /* Name of package */
-#undef PACKAGE
+#cmakedefine PACKAGE
 
 /* Define to the address where bug reports for this package should be sent. */
-#undef PACKAGE_BUGREPORT
+#cmakedefine PACKAGE_BUGREPORT
 
 /* Define to the full name of this package. */
-#undef PACKAGE_NAME
+#cmakedefine PACKAGE_NAME
 
 /* Define to the full name and version of this package. */
-#undef PACKAGE_STRING
+#cmakedefine PACKAGE_STRING
 
 /* Define to the one symbol short name of this package. */
-#undef PACKAGE_TARNAME
+#cmakedefine PACKAGE_TARNAME
 
 /* Define to the home page for this package. */
-#undef PACKAGE_URL
+#cmakedefine PACKAGE_URL
 
 /* Define to the version of this package. */
-#undef PACKAGE_VERSION
+#cmakedefine PACKAGE_VERSION
 
 /* Define if compiler supports [[deprecated]] attribute */
-#undef PQXX_HAVE_DEPRECATED
+#cmakedefine PQXX_HAVE_DEPRECATED
 
 /* Define if the compiler supports std::experimental::optional. */
-#undef PQXX_HAVE_EXP_OPTIONAL
+#cmakedefine PQXX_HAVE_EXP_OPTIONAL
 
 /* Define if g++ supports const attribute. */
-#undef PQXX_HAVE_GCC_CONST
+#cmakedefine PQXX_HAVE_GCC_CONST
 
 /* Define if g++ supports deprecated attribute. */
-#undef PQXX_HAVE_GCC_DEPRECATED
+#cmakedefine PQXX_HAVE_GCC_DEPRECATED
 
 /* Define if g++ supports pure attribute */
-#undef PQXX_HAVE_GCC_PURE
+#cmakedefine PQXX_HAVE_GCC_PURE
 
 /* Define if g++ supports visibility attribute. */
-#undef PQXX_HAVE_GCC_VISIBILITY
+#cmakedefine PQXX_HAVE_GCC_VISIBILITY
 
 /* Define if the compiler supports std::optional. */
-#undef PQXX_HAVE_OPTIONAL
+#cmakedefine PQXX_HAVE_OPTIONAL
 
 /* Define to 1 if you have the ANSI C header files. */
-#undef STDC_HEADERS
-
-/* Version number of package */
-#undef VERSION
+#cmakedefine STDC_HEADERS

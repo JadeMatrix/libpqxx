@@ -13,7 +13,7 @@
 
 
 // Workarounds & definitions needed to compile libpqxx into a library
-#include "pqxx/config-internal-compiler.h"
+#include "pqxx/config.hxx"
 
 #ifdef _WIN32
 

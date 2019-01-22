@@ -1,56 +1,105 @@
-cmake_minimum_required (VERSION 3.7)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.7)
 
-file(READ VERSION VER_FILE_CONTENT)
-string(STRIP ${VER_FILE_CONTENT} VER_FILE_CONTENT)
 
-project(libpqxx VERSION ${VER_FILE_CONTENT} LANGUAGES CXX)
+FILE(READ "VERSION" libpqxx_VERSION)
+STRING(STRIP "${libpqxx_VERSION}" libpqxx_VERSION)
 
-if(NOT "${CMAKE_CXX_STANDARD}")
-    set(CMAKE_CXX_STANDARD 11)
-endif()
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
+PROJECT(libpqxx VERSION "${libpqxx_VERSION}" LANGUAGES CXX)
 
-if(NOT SKIP_BUILD_TEST)
-	option(BUILD_TEST "Build all test cases" ON)
-endif()
 
-include(GNUInstallDirs)
-include(CMakePackageConfigHelpers)
-include(config)
+SET(CMAKE_CXX_STANDARD 11)
+SET(CMAKE_CXX_STANDARD_REQUIRED ON)
+SET(CMAKE_CXX_EXTENSIONS OFF)
+LIST(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/")
 
-add_subdirectory(src)
-add_subdirectory(include)
-if (BUILD_TEST)
-  add_subdirectory(test)
-endif ()
+INCLUDE(GNUInstallDirs)
+INCLUDE(CMakePackageConfigHelpers)
 
-# installation
-write_basic_package_version_file(
-  "${CMAKE_CURRENT_BINARY_DIR}/libpqxx-config-version.cmake"
-  VERSION ${PROJECT_VERSION}
-  COMPATIBILITY SameMajorVersion
+INCLUDE(PQXXConfig)
+
+
+IF(
+    "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GCC"
+    OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang"
+    OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel"
 )
-install(FILES cmake/libpqxx-config.cmake "${CMAKE_CURRENT_BINARY_DIR}/libpqxx-config-version.cmake"
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/libpqxx
+    SET(PQXX_COMPILE_OPTIONS
+        "-fstrict-enums"
+        # "-Werror"
+        "-Wall"
+        "-pedantic"
+        "-Wcast-align"
+        "-Wcast-qual"
+        "-Wconversion"
+        "-Wctor-dtor-privacy"
+        "-Wendif-labels"
+        "-Wextra"
+        "-Wfloat-equal"
+        "-Wformat=2"
+        "-Wformat-security"
+        "-Wmissing-include-dirs"
+        "-Wno-div-by-zero"
+        "-Wnon-virtual-dtor"
+        "-Wold-style-cast"
+        "-Woverlength-strings"
+        "-Woverloaded-virtual"
+        "-Wpointer-arith"
+        "-Wredundant-decls"
+        "-Wshadow"
+        "-Wsign-promo"
+        "-Wwrite-strings"
+        "-Wundef"
+        "-Wunused"
+        "-Wextra-semi"
+        "-fvisibility=hidden"
+        "-fvisibility-inlines-hidden"
+    )
+    IF("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GCC")
+        LIST(APPEND PQXX_COMPILE_OPTIONS
+            "-fnothrow-opt"
+            "-Wattribute-alias"
+            "-Wlogical-op"
+            "-Wrestrict"
+            "-Wstringop-overflow"
+            "-Wsuggest-override"
+            "-Wzero-as-null-pointer-constant"
+        )
+    ENDIF()
+ELSEIF("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+    SET(PQXX_COMPILE_OPTIONS "/Wall" "/WX")
+ENDIF()
+
+ADD_SUBDIRECTORY("include/")
+ADD_SUBDIRECTORY("src/")
+
+# TODO: make changelog
+# git log --stat --name-only --date=short --abbrev-commit >$@
+
+
+WRITE_BASIC_PACKAGE_VERSION_FILE(
+    "${CMAKE_CURRENT_BINARY_DIR}/libpqxx-config-version.cmake"
+    VERSION "${PROJECT_VERSION}"
+    COMPATIBILITY SameMajorVersion
 )
-install(
-  EXPORT libpqxx-targets
-  NAMESPACE libpqxx::
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/libpqxx
+CONFIGURE_FILE(
+    "config/libpqxx-config.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/libpqxx-config.cmake"
+    COPYONLY
 )
-# Build tree export
-export(EXPORT libpqxx-targets
-  NAMESPACE libpqxx::
-  FILE ${CMAKE_CURRENT_BINARY_DIR}/libpqxx-targets.cmake
+
+INSTALL(
+    FILES
+        "${CMAKE_CURRENT_BINARY_DIR}/libpqxx-config.cmake"
+        "${CMAKE_CURRENT_BINARY_DIR}/libpqxx-config-version.cmake"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/libpqxx"
 )
-configure_file(
-  cmake/libpqxx-config.cmake
-  ${CMAKE_CURRENT_BINARY_DIR}/libpqxx-config.cmake
-  COPYONLY
+INSTALL(
+    EXPORT libpqxx-targets
+    NAMESPACE "libpqxx::"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/libpqxx"
 )
-# Package generation
-set(CPACK_GENERATOR TGZ)
-set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
-include(CPack)
+
+EXPORT(EXPORT libpqxx-targets
+    NAMESPACE "libpqxx::"
+    FILE "${CMAKE_CURRENT_BINARY_DIR}/libpqxx-targets.cmake"
+)

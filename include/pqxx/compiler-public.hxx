@@ -9,9 +9,6 @@
 #ifndef PQXX_H_COMPILER_PUBLIC
 #define PQXX_H_COMPILER_PUBLIC
 
-// Workarounds & definitions that need to be included even in library's headers
-#include "pqxx/config.hxx"
-
 // Workarounds for SUN Workshop 6
 #if defined(__SUNPRO_CC)
 #define PQXX_PRIVATE __hidden

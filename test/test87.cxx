@@ -3,7 +3,6 @@
 #include <cstring>
 #include <ctime>
 #include <iostream>
-#include "pqxx/config.hxx"
 
 #if defined(HAVE_SYS_SELECT_H)
 #include <sys/select.h>

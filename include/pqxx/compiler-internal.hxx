@@ -12,9 +12,6 @@
 #define PQXX_H_COMPILER_INTERNAL
 
 
-// Workarounds & definitions needed to compile libpqxx into a library
-#include "pqxx/config.hxx"
-
 #ifdef _WIN32
 
 #ifdef PQXX_SHARED

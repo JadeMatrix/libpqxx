@@ -10,13 +10,31 @@ PROJECT(libpqxx VERSION "${libpqxx_VERSION}" LANGUAGES CXX)
 SET(CMAKE_CXX_STANDARD 11)
 SET(CMAKE_CXX_STANDARD_REQUIRED ON)
 SET(CMAKE_CXX_EXTENSIONS OFF)
-LIST(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/")
+LIST(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/CMakeModules/")
 
 INCLUDE(GNUInstallDirs)
 INCLUDE(CMakePackageConfigHelpers)
 
-INCLUDE(PQXXConfig)
+INCLUDE(PQXXSystemConfig)
 
+
+# Target configuration
+SET(PQXX_ABI_VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}")
+CONFIGURE_FILE(
+    "${PROJECT_SOURCE_DIR}/config/version.hxx.in"
+    "${PROJECT_BINARY_DIR}/include/pqxx/version.hxx"
+    @ONLY
+)
+INSTALL(
+    DIRECTORY "${PROJECT_BINARY_DIR}/include/pqxx"
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+)
+INSTALL(
+    FILES
+        "CMakeModules/PQXXSystemConfig.cmake"
+        "CMakeModules/FindPostgreSQL.cmake"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/libpqxx/CMakeModules/"
+)
 
 IF(
     "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GCC"
@@ -70,13 +88,14 @@ ELSEIF("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
 ENDIF()
 
 
+# Subdirectories
 ENABLE_TESTING()
-
 ADD_SUBDIRECTORY("include/")
 ADD_SUBDIRECTORY("src/")
 ADD_SUBDIRECTORY("test/")
 
 
+# Package configuration
 WRITE_BASIC_PACKAGE_VERSION_FILE(
     "${CMAKE_CURRENT_BINARY_DIR}/libpqxx-config-version.cmake"
     VERSION "${PROJECT_VERSION}"
@@ -87,7 +106,6 @@ CONFIGURE_FILE(
     "${CMAKE_CURRENT_BINARY_DIR}/libpqxx-config.cmake"
     COPYONLY
 )
-
 INSTALL(
     FILES
         "${CMAKE_CURRENT_BINARY_DIR}/libpqxx-config.cmake"

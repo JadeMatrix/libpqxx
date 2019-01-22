@@ -69,11 +69,12 @@ ELSEIF("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
     SET(PQXX_COMPILE_OPTIONS "/Wall" "/WX")
 ENDIF()
 
+
+ENABLE_TESTING()
+
 ADD_SUBDIRECTORY("include/")
 ADD_SUBDIRECTORY("src/")
-
-# TODO: make changelog
-# git log --stat --name-only --date=short --abbrev-commit >$@
+ADD_SUBDIRECTORY("test/")
 
 
 WRITE_BASIC_PACKAGE_VERSION_FILE(

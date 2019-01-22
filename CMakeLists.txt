@@ -25,7 +25,7 @@ IF(
 )
     SET(PQXX_COMPILE_OPTIONS
         "-fstrict-enums"
-        # "-Werror"
+        "-Werror"
         "-Wall"
         "-pedantic"
         "-Wcast-align"

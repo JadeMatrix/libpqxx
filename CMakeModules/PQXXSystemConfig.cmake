@@ -36,7 +36,7 @@ CHECK_CXX_SOURCE_COMPILES(
     FAIL_REGEX "warning|error"
 )
 CHECK_CXX_SOURCE_COMPILES(
-    "#include <optional>\nint main() { std::experimental::optional<int> o; }"
+    "#include <experimental/optional>\nint main() { std::experimental::optional<int> o; }"
     PQXX_HAVE_EXP_OPTIONAL
     FAIL_REGEX "warning|error"
 )

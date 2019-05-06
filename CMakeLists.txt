@@ -99,7 +99,7 @@ ADD_SUBDIRECTORY("test/")
 WRITE_BASIC_PACKAGE_VERSION_FILE(
     "${CMAKE_CURRENT_BINARY_DIR}/libpqxx-config-version.cmake"
     VERSION "${PROJECT_VERSION}"
-    COMPATIBILITY SameMajorVersion
+    COMPATIBILITY SameMinorVersion
 )
 CONFIGURE_FILE(
     "config/libpqxx-config.cmake.in"

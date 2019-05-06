@@ -38,24 +38,27 @@ SET(PQXX_SOURCES
 
 
 MACRO(PQXX_ADD_LIBRARY NAME TYPE)
-    ADD_LIBRARY(${NAME} ${TYPE} ${PQXX_SOURCES})
-    SET_TARGET_PROPERTIES(${NAME} PROPERTIES OUTPUT_NAME "pqxx")
+    ADD_LIBRARY("${NAME}" "${TYPE}")
+    SET_TARGET_PROPERTIES("${NAME}" PROPERTIES
+        OUTPUT_NAME "pqxx"
+        VERSION "${PROJECT_VERSION}"
+        SOVERSION "${PROJECT_VERSION}"
+    )
 
+    TARGET_SOURCES("${NAME}" PRIVATE ${PQXX_SOURCES})
     TARGET_INCLUDE_DIRECTORIES(
-        ${NAME}
+        "${NAME}"
         PUBLIC
             "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>"
             "$<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>"
             "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
     )
-    # libpq has to be marked PUBLIC so it's linked when static libpqxx is used
-    TARGET_LINK_LIBRARIES(${NAME} PUBLIC PostgreSQL::pq)
     IF(WIN32)
-        TARGET_LINK_LIBRARIES(${NAME} PUBLIC wsock32 ws2_32)
+        TARGET_LINK_LIBRARIES("${NAME}" PUBLIC wsock32 ws2_32)
     ENDIF()
-    TARGET_COMPILE_OPTIONS(${NAME} PRIVATE ${PQXX_COMPILE_OPTIONS})
+    TARGET_COMPILE_OPTIONS("${NAME}" PRIVATE ${PQXX_COMPILE_OPTIONS})
     TARGET_COMPILE_DEFINITIONS(
-        ${NAME}
+        "${NAME}"
         PRIVATE ${PQXX_PRIVATE_COMPILE_DEFINITIONS}
         PUBLIC ${PQXX_PUBLIC_COMPILE_DEFINITIONS}
     )
@@ -72,6 +75,11 @@ ENDMACRO()
 
 PQXX_ADD_LIBRARY(pqxx STATIC)
 PQXX_ADD_LIBRARY(pqxx-shared SHARED)
+
+# libpq has to be marked PUBLIC for static libpqxx for linking purposes but can
+# be marked PRIVATE for the shared library
+TARGET_LINK_LIBRARIES(pqxx PUBLIC PostgreSQL::pq)
+TARGET_LINK_LIBRARIES(pqxx-shared PRIVATE PostgreSQL::pq)
 
 # Export alias to `pqxx` called `pqxx-static`
 ADD_LIBRARY(pqxx-static INTERFACE)

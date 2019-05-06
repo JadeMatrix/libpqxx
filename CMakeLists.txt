@@ -26,15 +26,18 @@ CONFIGURE_FILE(
     "${PROJECT_BINARY_DIR}/include/pqxx/version.hxx"
     @ONLY
 )
+# Installation of generated header files
 INSTALL(
     DIRECTORY "${PROJECT_BINARY_DIR}/include/pqxx"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+    COMPONENT headers
 )
 INSTALL(
     FILES
         "CMakeModules/PQXXSystemConfig.cmake"
         "CMakeModules/FindPostgreSQL.cmake"
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/libpqxx/CMakeModules/"
+    COMPONENT cmake
 )
 
 IF(
@@ -108,11 +111,13 @@ INSTALL(
         "config/libpqxx-config.cmake"
         "${CMAKE_CURRENT_BINARY_DIR}/libpqxx-config-version.cmake"
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/libpqxx"
+    COMPONENT cmake
 )
 INSTALL(
     EXPORT libpqxx-targets
     NAMESPACE "libpqxx::"
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/libpqxx"
+    COMPONENT cmake
 )
 
 SET(PQXX_PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.pc")
@@ -120,6 +125,7 @@ CONFIGURE_FILE("config/pkg-config.pc.in" "${PQXX_PKGCONFIG_FILE}" @ONLY)
 INSTALL(
     FILES "${PQXX_PKGCONFIG_FILE}"
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig/"
+    COMPONENT pkg-config
 )
 
 EXPORT(EXPORT libpqxx-targets

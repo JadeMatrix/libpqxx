@@ -31,12 +31,12 @@ IF("cxx_attribute_deprecated" IN_LIST CMAKE_CXX_COMPILE_FEATURES)
 ENDIF()
 
 CHECK_CXX_SOURCE_COMPILES(
-    "#include <optional>\nint main() { std::optional<int> o; }"
+    "#include <optional>\nint main(int, char*[]) { std::optional<int> o{0}; return *o; }"
     PQXX_HAVE_OPTIONAL
     FAIL_REGEX "warning|error"
 )
 CHECK_CXX_SOURCE_COMPILES(
-    "#include <experimental/optional>\nint main() { std::experimental::optional<int> o; }"
+    "#include <experimental/optional>\nint main(int, char*[]) { std::experimental::optional<int> o{0}; return *o; }"
     PQXX_HAVE_EXP_OPTIONAL
     FAIL_REGEX "warning|error"
 )

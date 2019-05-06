@@ -14,6 +14,7 @@ LIST(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/CMakeModules/")
 
 INCLUDE(GNUInstallDirs)
 INCLUDE(CMakePackageConfigHelpers)
+INCLUDE(CTest)
 
 INCLUDE(PQXXSystemConfig)
 
@@ -89,10 +90,11 @@ ENDIF()
 
 
 # Subdirectories
-ENABLE_TESTING()
 ADD_SUBDIRECTORY("include/")
 ADD_SUBDIRECTORY("src/")
-ADD_SUBDIRECTORY("test/")
+IF(BUILD_TESTING)
+    ADD_SUBDIRECTORY("test/")
+ENDIF()
 
 
 # Package configuration

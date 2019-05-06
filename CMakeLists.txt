@@ -103,14 +103,9 @@ WRITE_BASIC_PACKAGE_VERSION_FILE(
     VERSION "${PROJECT_VERSION}"
     COMPATIBILITY SameMinorVersion
 )
-CONFIGURE_FILE(
-    "config/libpqxx-config.cmake.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/libpqxx-config.cmake"
-    COPYONLY
-)
 INSTALL(
     FILES
-        "${CMAKE_CURRENT_BINARY_DIR}/libpqxx-config.cmake"
+        "config/libpqxx-config.cmake"
         "${CMAKE_CURRENT_BINARY_DIR}/libpqxx-config-version.cmake"
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/libpqxx"
 )

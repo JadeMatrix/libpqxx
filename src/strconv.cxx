@@ -1,6 +1,6 @@
 /** Implementation of string conversions.
  *
- * Copyright (c) 2008-2018, Jeroen T. Vermeulen.
+ * Copyright (c) 2008-2019, Jeroen T. Vermeulen.
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -178,7 +178,10 @@ bool valid_infinity_string(const char str[]) noexcept
 template<typename T> class dumb_stringstream : public std::stringstream
 {
 public:
-  dumb_stringstream() : std::stringstream{}
+  // Do not initialise the base-class object using "stringstream{}" (with curly
+  // braces): that breaks on Visual C++.  The classic "stringstream()" syntax
+  // (with parentheses) does work.
+  dumb_stringstream()
   {
     this->imbue(std::locale::classic());
 
@@ -342,7 +345,7 @@ void string_traits<bool>::from_string(const char Str[], bool &Obj)
 
   case '1':
     result = true;
-    OK = (Str[1] != '\0');
+    OK = (Str[1] == '\0');
     break;
 
   case 't':

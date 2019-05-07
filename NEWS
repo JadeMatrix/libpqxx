@@ -1,5 +1,4 @@
 6.3.0
- - Still in progress.  Caution is advised!
  - New "table stream" classes by Joseph Durel: stream_from/stream_to.
  - Support weird characters in more identifiers: cursors, notifcations, etc.
  - Connection policies are deprecated.  It'll all be one class in 7.0!
@@ -12,6 +11,7 @@
  - Fix nested project builds in CMake.  Thanks Andrew Brownsword.
  - In Visual Studio, build for host architecture, not "x64".
  - Fix string conversion link error in Visual Studio.  Thanks Ivan Poiakov.
+ - Fix string conversion to bool for "1".  Thanks Amaracs.
  - Fix in escaping of strings in arrays.  Thanks smirql.
  - Faster copying of results of large queries.  Thanks Vsevolod Strukchinsky.
  - Starting to handle encodings properly!  Thanks to Joseph Durel.

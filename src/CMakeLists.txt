@@ -35,6 +35,9 @@ SET(PQXX_SOURCES
     "util.cxx"
     "version.cxx"
 )
+IF(WIN32)
+    LIST(APPEND PQXX_SOURCES "${PROJECT_SOURCE_DIR}/win32/libpqxx.cxx")
+ENDIF()
 
 
 MACRO(PQXX_ADD_LIBRARY NAME TYPE)

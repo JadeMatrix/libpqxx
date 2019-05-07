@@ -73,7 +73,10 @@ add_compiler_opts_if_ok() {
 		ACO_SAVE_CXXFLAGS="$CXXFLAGS"
 		CXXFLAGS="$CXXFLAGS $option"
 		AC_MSG_CHECKING([whether $CXX accepts $option])
-		AC_TRY_COMPILE([], [], has_option=yes, has_option=no,)
+		AC_COMPILE_IFELSE(
+			[AC_LANG_PROGRAM([], [])],
+			has_option=yes,
+			has_option=no)
 		AC_MSG_RESULT($has_option)
 		AS_IF(
 		    [test "$has_option" = "no" ],
@@ -147,15 +150,17 @@ AC_MSG_CHECKING([g++ visibility attribute])
 gcc_visibility=yes
 SAVE_CXXFLAGS="$CXXFLAGS"
 CXXFLAGS="$CXXFLAGS -Werror"
-AC_TRY_COMPILE(
-	[
-		struct __attribute__ ((visibility("hidden"))) d
-		{
-			d() {}
-			void f() {}
-		};
-	],
-	[d D; D.f()],
+AC_COMPILE_IFELSE(
+	[AC_LANG_PROGRAM(
+		[[
+			struct __attribute__ ((visibility("hidden"))) d
+			{
+				d() {}
+				void f() {}
+			};
+		]],
+		[[d D; D.f()]]
+	)],
 	AC_DEFINE(
 		[PQXX_HAVE_GCC_VISIBILITY],
 		1,
@@ -185,9 +190,11 @@ if test "$deprecated" != "yes"
 then
 AC_MSG_CHECKING([g++ deprecation attribute])
 gcc_deprecated=yes
-AC_TRY_COMPILE(
-	[__attribute__ ((deprecated)) void f();],
-	[],
+AC_COMPILE_IFELSE(
+	[AC_LANG_PROGRAM(
+		[[__attribute__ ((deprecated)) void f();]],
+		[]
+	)],
 	AC_DEFINE(
 		[PQXX_HAVE_GCC_DEPRECATED],
 		1,
@@ -198,9 +205,8 @@ fi
 
 AC_MSG_CHECKING([g++ pure attribute])
 gcc_pure=yes
-AC_TRY_COMPILE(
-	[void __attribute__ ((pure)) f();],
-	[],
+AC_COMPILE_IFELSE(
+	[AC_LANG_PROGRAM([void __attribute__ ((pure)) f();], [])],
 	AC_DEFINE(
 		[PQXX_HAVE_GCC_PURE],
 		1,
@@ -213,9 +219,8 @@ fi # End of gcc-specific part.
 
 AC_MSG_CHECKING([C++14 deprecation attribute])
 deprecated=yes
-AC_TRY_COMPILE(
-	[[[deprecated]] void f();],
-	[],
+AC_COMPILE_IFELSE(
+	[AC_LANG_PROGRAM([[/* */ [[deprecated]] void f(); ]], [])],
 	AC_DEFINE(
 		[PQXX_HAVE_DEPRECATED],
 		1,
@@ -226,9 +231,11 @@ AC_MSG_RESULT($deprecated)
 
 AC_MSG_CHECKING([for C++17 std::optional support])
 have_optional=yes
-AC_TRY_COMPILE(
-	[#include <optional>],
-	[return std::optional<int>(0).value()],
+AC_COMPILE_IFELSE(
+	[AC_LANG_PROGRAM(
+		[[#include <optional>]],
+		[return std::optional<int>(0).value()]
+	)],
 	AC_DEFINE(
 		[PQXX_HAVE_OPTIONAL],
 		1,
@@ -240,9 +247,11 @@ if test "$have_optional" != "yes"
 then
 AC_MSG_CHECKING([for experimental C++17 std::optional support])
 have_exp_optional=yes
-AC_TRY_COMPILE(
-	[#include <experimental/optional>],
-	[return std::experimental::optional<int>(0).value()],
+AC_COMPILE_IFELSE(
+	[AC_LANG_PROGRAM(
+		[#include <experimental/optional>],
+		[return std::experimental::optional<int>(0).value()]
+	)],
 	AC_DEFINE(
 		[PQXX_HAVE_EXP_OPTIONAL],
 		1,
@@ -252,10 +261,69 @@ AC_MSG_RESULT($have_exp_optional)
 fi
 
 
+# It's early 2019, and gcc's charconv supports integers but not yet floats.
+# So for now, we test for int and float conversion... separately.
+#
+# It's worse for clang, which compiles the integer conversions but then fails
+# at link time because of a missing symbol "__muloti4" when compiling
+# "long long" code.  I couldn't resolve that symbol by adding -lm either.  So
+# don't just compile these tests; link them as well.
+AC_MSG_CHECKING([for C++17 charconv integer conversion])
+have_charconv_int=yes
+AC_LINK_IFELSE(
+	[AC_LANG_PROGRAM(
+		[#include <charconv>],
+		[[
+			char z[100];
+			using ull = unsigned long long;
+			auto rt = std::to_chars(z, z + sizeof(z), ull{0});
+			if (rt.ec != std::errc{}) return 1;
+			ull n;
+			auto rf = std::from_chars(z, z + sizeof(z), n);
+			if (rf.ec != std::errc{}) return 2;
+			return int(n)
+		]]
+	)],
+	AC_DEFINE(
+		[PQXX_HAVE_CHARCONV_INT],
+		1,
+		[Define if <charconv> supports integer conversion.]),
+	have_charconv_int=no)
+AC_MSG_RESULT($have_charconv_int)
+
+AC_MSG_CHECKING([for C++17 charconv floating-point conversion])
+have_charconv_float=yes
+AC_LINK_IFELSE(
+	[AC_LANG_PROGRAM(
+		[#include <charconv>],
+		[[
+			char z[100];
+			using ld = long double;
+			auto rt = std::to_chars(
+				z, z + sizeof(z), ld{0.1},
+				std::chars_format::generic);
+			if (rt.ec != std::errc{}) return 1;
+			ld n;
+			auto rf = std::from_chars(z, z + sizeof(z), n);
+			if (rf.ec != std::errc{}) return 2;
+			return int(n)
+		]]
+	)],
+	AC_DEFINE(
+		[PQXX_HAVE_CHARCONV_FLOAT],
+		1,
+		[Define if <charconv> supports floating-point conversion.]),
+	have_charconv_float=no)
+AC_MSG_RESULT($have_charconv_float)
+
 AX_HAVE_POLL(
         [AX_CONFIG_FEATURE_ENABLE(poll)],
         [AX_CONFIG_FEATURE_DISABLE(poll)])
-AX_CONFIG_FEATURE([poll], [System supports poll().], [HAVE_POLL], [System supports poll().])
+AX_CONFIG_FEATURE(
+	[poll],
+	[System supports poll().],
+	[HAVE_POLL],
+	[System supports poll().])
 
 if test "$ax_cv_have_poll" != "yes"
 then
@@ -356,8 +424,11 @@ In that case, make sure you have the latter installed as well.
 
 
 AC_MSG_CHECKING([for ability to compile source files using libpq])
-AC_TRY_COMPILE(
-	[#include<${with_postgres_include}/libpq-fe.h>],[PQexec(nullptr,"")],
+AC_COMPILE_IFELSE(
+	[AC_LANG_PROGRAM(
+		[[#include<${with_postgres_include}/libpq-fe.h>]],
+		[[PQexec(nullptr,"")]]
+	)],
 	[],
 	[AC_MSG_ERROR([
 Could not compile a call to a basic libpq function.  There must be something
@@ -398,13 +469,15 @@ LIBS=[$(echo "$LIBS" | sed -e 's/-lpq * -lpq\>/-lpq/g')]
 
 
 AC_MSG_CHECKING([that type of libpq's Oid is as expected])
-AC_TRY_COMPILE(
-	[
-		#include<${with_postgres_include}/libpq-fe.h>
-		#include"${srcdir}/include/pqxx/internal/libpq-forward.hxx"
-		extern void f(pqxx::oid&);
-	],
-	[Oid o;f(o)],
+AC_COMPILE_IFELSE(
+	[AC_LANG_PROGRAM(
+		[
+			#include<${with_postgres_include}/libpq-fe.h>
+			#include"${srcdir}/include/pqxx/internal/libpq-forward.hxx"
+			extern void f(pqxx::oid&);
+		],
+		[Oid o;f(o)],
+	)],
 	[],
 	[AC_MSG_ERROR([
 The Oid typedef in libpq has changed.  Please notify the libpqxx authors of the

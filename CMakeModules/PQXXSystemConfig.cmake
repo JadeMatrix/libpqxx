@@ -48,6 +48,21 @@ PQXX_CHECK_CXX_FILE_COMPILES(
     PQXX_HAVE_EXP_OPTIONAL
 )
 
+# It's early 2019, and gcc's charconv supports integers but not yet floats.
+# So for now, we test for int and float conversion... separately.
+#
+# It's worse for clang, which compiles the integer conversions but then fails
+# at link time because of a missing symbol "__muloti4" when compiling
+# "long long" code.  I couldn't resolve that symbol by adding -lm either.
+PQXX_CHECK_CXX_FILE_COMPILES(
+    "charconv-int"
+    PQXX_HAVE_CHARCONV_INT
+)
+PQXX_CHECK_CXX_FILE_COMPILES(
+    "charconv-float"
+    PQXX_HAVE_CHARCONV_FLOAT
+)
+
 PQXX_DETECT_ATTRIBUTE("const" PQXX_HAVE_GCC_CONST)
 PQXX_DETECT_ATTRIBUTE("pure" PQXX_HAVE_GCC_PURE)
 PQXX_DETECT_ATTRIBUTE(
@@ -78,6 +93,8 @@ FOREACH(DEFINE
     PQXX_HAVE_GCC_CONST
     PQXX_HAVE_GCC_PURE
     PQXX_HAVE_GCC_VISIBILITY
+    PQXX_HAVE_CHARCONV_INT
+    PQXX_HAVE_CHARCONV_FLOAT
 )
     IF(${DEFINE})
         LIST(APPEND PQXX_PUBLIC_COMPILE_DEFINITIONS "${DEFINE}")

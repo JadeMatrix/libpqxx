@@ -1,6 +1,7 @@
+#include <cstdint>
+
 #include "../test_helpers.hxx"
 
-using namespace std;
 using namespace pqxx;
 
 // Some enums with string conversions.
@@ -34,7 +35,7 @@ void test_string_conversion()
 	to_string(text_ptr),
 	"C-style string pointer does not convert to string properly.");
 
-  const string cxx_string = "C++ string";
+  const std::string cxx_string = "C++ string";
   PQXX_CHECK_EQUAL(
 	"C++ string",
 	to_string(cxx_string),
@@ -64,10 +65,10 @@ void test_string_conversion()
   // Bug #263 describes a case where this kind of overflow went undetected.
   if (sizeof(unsigned int) == 4)
   {
-    unsigned int u;
+    std::uint32_t u;
     PQXX_CHECK_THROWS(
 	from_string("4772185884", u),
-	pqxx::failure,
+	pqxx::conversion_error,
 	"Overflow not detected.");
   }
 

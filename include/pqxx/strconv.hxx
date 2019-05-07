@@ -2,7 +2,7 @@
  *
  * DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/stringconv instead.
  *
- * Copyright (c) 2008-2018, Jeroen T. Vermeulen.
+ * Copyright (c) 2008-2019, Jeroen T. Vermeulen.
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -44,7 +44,6 @@ namespace pqxx
  */
 //@{
 
-// TODO: Probably better not to supply a default template.
 /// Traits class for use in string conversions
 /** Specialize this template for a type that you wish to add to_string and
  * from_string support for.
@@ -190,8 +189,8 @@ template<> struct PQXX_LIBEXPORT string_traits<std::string>
   static constexpr const char *name() noexcept { return "string"; }
   static constexpr bool has_null() noexcept { return false; }
   static bool is_null(const std::string &) { return false; }
-  static std::string null()
-	{ internal::throw_null_conversion(name()); return std::string{}; }
+  [[noreturn]] static std::string null()
+	{ internal::throw_null_conversion(name()); }
   static void from_string(const char Str[], std::string &Obj) { Obj=Str; }
   static std::string to_string(const std::string &Obj) { return Obj; }
 };
@@ -201,8 +200,8 @@ template<> struct PQXX_LIBEXPORT string_traits<const std::string>
   static constexpr const char *name() noexcept { return "const string"; }
   static constexpr bool has_null() noexcept { return false; }
   static bool is_null(const std::string &) { return false; }
-  static const std::string null()
-	{ internal::throw_null_conversion(name()); return std::string{}; }
+  [[noreturn]] static const std::string null()
+	{ internal::throw_null_conversion(name()); }
   static const std::string to_string(const std::string &Obj) { return Obj; }
 };
 
@@ -211,12 +210,8 @@ template<> struct PQXX_LIBEXPORT string_traits<std::stringstream>
   static constexpr const char *name() noexcept { return "stringstream"; }
   static constexpr bool has_null() noexcept { return false; }
   static bool is_null(const std::stringstream &) { return false; }
-  static std::stringstream null()
-  {
-    internal::throw_null_conversion(name());
-    // No, dear compiler, we don't need a return here.
-    throw 0;
-  }
+  [[noreturn]] static std::stringstream null()
+	{ internal::throw_null_conversion(name()); }
   static void from_string(const char Str[], std::stringstream &Obj)
 	{ Obj.clear(); Obj << Str; }
   static std::string to_string(const std::stringstream &Obj)
@@ -224,7 +219,7 @@ template<> struct PQXX_LIBEXPORT string_traits<std::stringstream>
 };
 
 
-// TODO: Implement date conversions
+// TODO: Implement date conversions.
 
 /// Attempt to convert postgres-generated string to given built-in type
 /** If the form of the value found in the string does not match the expected

@@ -4,7 +4,7 @@
  *
  * DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/pipeline instead.
  *
- * Copyright (c) 2003-2018, Jeroen T. Vermeulen.
+ * Copyright (c) 2003-2019, Jeroen T. Vermeulen.
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -98,7 +98,7 @@ public:
   /// Is result for given query available?
   bool is_finished(query_id) const;					//[t71]
 
-  /// Retrieve result for given query
+  /// Retrieve result for given query.
   /** If the query failed for whatever reason, this will throw an exception.
    * The function will block if the query has not finished yet.
    * @warning If results are retrieved out-of-order, i.e. in a different order
@@ -136,7 +136,7 @@ private:
   class PQXX_PRIVATE Query
   {
   public:
-    explicit Query(const std::string &q) : m_query(q), m_res() {}
+    explicit Query(const std::string &q) : m_query{q}, m_res{} {}
 
     const result &get_result() const noexcept { return m_res; }
     void set_result(const result &r) noexcept { m_res = r; }

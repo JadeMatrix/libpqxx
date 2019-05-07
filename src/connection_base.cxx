@@ -2,7 +2,7 @@
  *
  * pqxx::connection_base encapsulates a frontend to backend connection.
  *
- * Copyright (c) 2001-2019, Jeroen T. Vermeulen.
+ * Copyright (c) 2000-2019, Jeroen T. Vermeulen.
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -1103,6 +1103,8 @@ std::string pqxx::connection_base::esc(const char str[], size_t maxlen)
 
   std::vector<char> buf(2 * maxlen + 1);
   int err = 0;
+  // TODO: Can we make a callback-based string_view alternative to this?
+  // TODO: If we can, then quote() can wrap PQescapeLiteral()!
   PQescapeStringConn(m_conn, buf.data(), str, maxlen, &err);
   if (err) throw argument_error{err_msg()};
   return std::string{buf.data()};

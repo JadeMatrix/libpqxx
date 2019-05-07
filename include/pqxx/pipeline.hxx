@@ -4,7 +4,7 @@
  *
  * DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/pipeline instead.
  *
- * Copyright (c) 2003-2019, Jeroen T. Vermeulen.
+ * Copyright (c) 2000-2019, Jeroen T. Vermeulen.
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -151,7 +151,7 @@ private:
 
   struct getquery
   {
-    getquery(){}	// Silences bogus warning in some gcc versions
+    getquery() =default;
     std::string operator()(QueryMap::const_iterator i) const
 	{ return i->second.get_query(); }
   };

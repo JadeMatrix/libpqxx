@@ -1,6 +1,6 @@
 /** Compiler deficiency workarounds for libpqxx clients.
  *
- * Copyright (c) 2002-2017, Jeroen T. Vermeulen.
+ * Copyright (c) 2002-2019, Jeroen T. Vermeulen.
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -9,10 +9,9 @@
 #ifndef PQXX_H_COMPILER_PUBLIC
 #define PQXX_H_COMPILER_PUBLIC
 
-// Workarounds for SUN Workshop 6
-#if defined(__SUNPRO_CC)
-#define PQXX_PRIVATE __hidden
-#endif	// __SUNPRO_CC
+// Some compilers, Visual Studio in particular, don't seem to support the
+// standard's ISO-646 keywords out of the box.
+#include <ciso646>
 
 
 #if defined(__GNUC__) && defined(PQXX_HAVE_GCC_CONST)
@@ -49,7 +48,7 @@
 // TODO: Define custom macro to govern how libpqxx will be linked to client
 #if !defined(PQXX_LIBEXPORT) && defined(PQXX_SHARED)
 #define PQXX_LIBEXPORT __declspec(dllimport)
-#endif	// !PQXX_LIBEXPORT && PQXX_SHARED
+#endif  // !PQXX_LIBEXPORT && PQXX_SHARED
 
 
 // Workarounds for Microsoft Visual C++
@@ -102,8 +101,8 @@
   #endif
 #endif
 
-#endif	// _MSC_VER
-#endif	// _WIN32
+#endif  // _MSC_VER
+#endif  // _WIN32
 
 
 #ifndef PQXX_LIBEXPORT

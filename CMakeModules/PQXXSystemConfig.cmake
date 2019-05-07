@@ -17,6 +17,15 @@ FUNCTION(PQXX_DETECT_ATTRIBUTE ATTRIBUTE OUT)
     )
 ENDFUNCTION()
 
+FUNCTION(PQXX_CHECK_CXX_FILE_COMPILES TESTNAME OUT)
+    FILE(READ "${CMAKE_CURRENT_LIST_DIR}/compile-checks/${TESTNAME}.cpp" SOURCE)
+    CHECK_CXX_SOURCE_COMPILES(
+        "${SOURCE}"
+        "${OUT}"
+        FAIL_REGEX "warning|error"
+    )
+ENDFUNCTION()
+
 
 CHECK_INCLUDE_FILE_CXX("sys/select.h" HAVE_SYS_SELECT_H)
 CHECK_INCLUDE_FILE_CXX("sys/time.h"   HAVE_SYS_TIME_H  )
@@ -30,15 +39,13 @@ IF("cxx_attribute_deprecated" IN_LIST CMAKE_CXX_COMPILE_FEATURES)
     SET(PQXX_HAVE_DEPRECATED)
 ENDIF()
 
-CHECK_CXX_SOURCE_COMPILES(
-    "#include <optional>\nint main(int, char*[]) { std::optional<int> o{0}; return *o; }"
+PQXX_CHECK_CXX_FILE_COMPILES(
+    "std-optional"
     PQXX_HAVE_OPTIONAL
-    FAIL_REGEX "warning|error"
 )
-CHECK_CXX_SOURCE_COMPILES(
-    "#include <experimental/optional>\nint main(int, char*[]) { std::experimental::optional<int> o{0}; return *o; }"
+PQXX_CHECK_CXX_FILE_COMPILES(
+    "std-experimental-optional"
     PQXX_HAVE_EXP_OPTIONAL
-    FAIL_REGEX "warning|error"
 )
 
 PQXX_DETECT_ATTRIBUTE("const" PQXX_HAVE_GCC_CONST)

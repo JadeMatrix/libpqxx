@@ -33,10 +33,8 @@ INSTALL(
     COMPONENT headers
 )
 INSTALL(
-    FILES
-        "CMakeModules/PQXXSystemConfig.cmake"
-        "CMakeModules/FindPostgreSQL.cmake"
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/libpqxx/CMakeModules/"
+    DIRECTORY "CMakeModules"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/libpqxx/"
     COMPONENT cmake
 )
 

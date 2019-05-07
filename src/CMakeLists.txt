@@ -52,8 +52,10 @@ MACRO(PQXX_ADD_LIBRARY NAME TYPE)
     TARGET_INCLUDE_DIRECTORIES(
         "${NAME}"
         PUBLIC
-            "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>"
+            # Although this shouldn't happen, prefer generated headers over
+            # headers in the source tree with the same name.
             "$<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>"
+            "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>"
             "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
     )
     IF(WIN32)

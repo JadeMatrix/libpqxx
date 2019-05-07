@@ -12,6 +12,9 @@ jobs:
           name: Install
           command: apt update && apt install -y python g++ libpq-dev postgresql build-essential make autoconf dh-autoreconf autoconf-archive automake cppcheck
       - run:
+          name: Identify
+          command: lsb_release -a && c++ --version
+      - run:
           name: Prepare postgres
           command: |
               mkdir /tmp/db &&
@@ -31,11 +34,12 @@ jobs:
           command: NOCONFIGURE=1 ./autogen.sh
       - run:
           name: Configure
+          # TODO: Add --enable-audit once container has a recent compiler.
           command: |
               ./configure \
-                  CXXFLAGS='-O0 -std=c++17' \
-                  --enable-maintainer-mode \
+                  CXXFLAGS='-std=c++17' \
                   --disable-documentation \
+                  --enable-maintainer-mode \
                   --enable-shared --disable-static
       - run:
           name: Make

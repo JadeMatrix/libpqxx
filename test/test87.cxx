@@ -3,7 +3,6 @@
 #include <cstring>
 #include <ctime>
 #include <iostream>
-#include "pqxx/config-public-compiler.h"
 
 #if __has_include(<sys/select.h>)
 #include <sys/select.h>

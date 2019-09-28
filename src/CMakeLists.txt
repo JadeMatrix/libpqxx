@@ -1,35 +1,55 @@
 FIND_PACKAGE(PostgreSQL REQUIRED COMPONENTS pq)
 
 
-SET(PQXX_SOURCES
-    "array.cxx"
-    "binarystring.cxx"
-    "connection.cxx"
-    "cursor.cxx"
-    "encodings.cxx"
-    "errorhandler.cxx"
-    "except.cxx"
-    "field.cxx"
-    "largeobject.cxx"
-    "notification.cxx"
-    "pipeline.cxx"
-    "result.cxx"
-    "robusttransaction.cxx"
-    "row.cxx"
-    "sql_cursor.cxx"
-    "statement_parameters.cxx"
-    "strconv.cxx"
-    "stream_from.cxx"
-    "stream_to.cxx"
-    "subtransaction.cxx"
-    "transaction.cxx"
-    "transaction_base.cxx"
-    "util.cxx"
-    "version.cxx"
+SET(PQXX_INCLUDE_INTERFACES
+    PUBLIC
+        # Although this shouldn't happen, prefer generated headers over headers
+        # in the source tree with the same name.
+        "$<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>"
+        "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>"
+        "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
+)
+
+
+ADD_LIBRARY(_pqxx OBJECT)
+TARGET_INCLUDE_DIRECTORIES(_pqxx ${PQXX_INCLUDE_INTERFACES})
+TARGET_SOURCES(_pqxx
+    PRIVATE
+        "array.cxx"
+        "binarystring.cxx"
+        "connection.cxx"
+        "cursor.cxx"
+        "encodings.cxx"
+        "errorhandler.cxx"
+        "except.cxx"
+        "field.cxx"
+        "largeobject.cxx"
+        "notification.cxx"
+        "pipeline.cxx"
+        "result.cxx"
+        "robusttransaction.cxx"
+        "row.cxx"
+        "sql_cursor.cxx"
+        "statement_parameters.cxx"
+        "strconv.cxx"
+        "stream_from.cxx"
+        "stream_to.cxx"
+        "subtransaction.cxx"
+        "transaction.cxx"
+        "transaction_base.cxx"
+        "util.cxx"
+        "version.cxx"
 )
 IF(WIN32)
-    LIST(APPEND PQXX_SOURCES "${PROJECT_SOURCE_DIR}/win32/libpqxx.cxx")
+    TARGET_SOURCES(_pqxx PRIVATE "${PROJECT_SOURCE_DIR}/win32/libpqxx.cxx")
+    TARGET_LINK_LIBRARIES(_pqxx PUBLIC wsock32 ws2_32)
 ENDIF()
+TARGET_COMPILE_OPTIONS(_pqxx PRIVATE ${PQXX_COMPILE_OPTIONS})
+TARGET_COMPILE_DEFINITIONS(
+    _pqxx
+    PRIVATE ${PQXX_PRIVATE_COMPILE_DEFINITIONS}
+    PUBLIC ${PQXX_PUBLIC_COMPILE_DEFINITIONS}
+)
 
 
 MACRO(PQXX_ADD_LIBRARY NAME TYPE)
@@ -40,23 +60,11 @@ MACRO(PQXX_ADD_LIBRARY NAME TYPE)
         SOVERSION "${PROJECT_ABI_VERSION}"
     )
 
-    TARGET_SOURCES("${NAME}" PRIVATE ${PQXX_SOURCES})
-    TARGET_INCLUDE_DIRECTORIES(
-        "${NAME}"
-        PUBLIC
-            # Although this shouldn't happen, prefer generated headers over
-            # headers in the source tree with the same name.
-            "$<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>"
-            "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>"
-            "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
-    )
-    IF(WIN32)
-        TARGET_LINK_LIBRARIES("${NAME}" PUBLIC wsock32 ws2_32)
-    ENDIF()
+    TARGET_INCLUDE_DIRECTORIES("${NAME}" ${PQXX_INCLUDE_INTERFACES})
+    TARGET_LINK_LIBRARIES("${NAME}" PRIVATE _pqxx)
     TARGET_COMPILE_OPTIONS("${NAME}" PRIVATE ${PQXX_COMPILE_OPTIONS})
     TARGET_COMPILE_DEFINITIONS(
         "${NAME}"
-        PRIVATE ${PQXX_PRIVATE_COMPILE_DEFINITIONS}
         PUBLIC ${PQXX_PUBLIC_COMPILE_DEFINITIONS}
     )
 

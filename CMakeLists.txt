@@ -78,7 +78,7 @@ ENDIF()
 
 # Subdirectories
 ADD_SUBDIRECTORY("include/")
-# ADD_SUBDIRECTORY("src/")
+ADD_SUBDIRECTORY("src/")
 # IF(BUILD_TESTING)
 #     ADD_SUBDIRECTORY("test/")
 # ENDIF()

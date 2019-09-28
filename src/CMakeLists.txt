@@ -1,0 +1,87 @@
+FIND_PACKAGE(PostgreSQL REQUIRED COMPONENTS pq)
+
+
+SET(PQXX_SOURCES
+    "array.cxx"
+    "binarystring.cxx"
+    "connection.cxx"
+    "cursor.cxx"
+    "encodings.cxx"
+    "errorhandler.cxx"
+    "except.cxx"
+    "field.cxx"
+    "largeobject.cxx"
+    "notification.cxx"
+    "pipeline.cxx"
+    "result.cxx"
+    "robusttransaction.cxx"
+    "row.cxx"
+    "sql_cursor.cxx"
+    "statement_parameters.cxx"
+    "strconv.cxx"
+    "stream_from.cxx"
+    "stream_to.cxx"
+    "subtransaction.cxx"
+    "transaction.cxx"
+    "transaction_base.cxx"
+    "util.cxx"
+    "version.cxx"
+)
+IF(WIN32)
+    LIST(APPEND PQXX_SOURCES "${PROJECT_SOURCE_DIR}/win32/libpqxx.cxx")
+ENDIF()
+
+
+MACRO(PQXX_ADD_LIBRARY NAME TYPE)
+    ADD_LIBRARY("${NAME}" "${TYPE}")
+    SET_TARGET_PROPERTIES("${NAME}" PROPERTIES
+        OUTPUT_NAME "pqxx"
+        VERSION "${PROJECT_VERSION}"
+        SOVERSION "${PROJECT_VERSION}"
+    )
+
+    TARGET_SOURCES("${NAME}" PRIVATE ${PQXX_SOURCES})
+    TARGET_INCLUDE_DIRECTORIES(
+        "${NAME}"
+        PUBLIC
+            # Although this shouldn't happen, prefer generated headers over
+            # headers in the source tree with the same name.
+            "$<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>"
+            "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>"
+            "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
+    )
+    IF(WIN32)
+        TARGET_LINK_LIBRARIES("${NAME}" PUBLIC wsock32 ws2_32)
+    ENDIF()
+    TARGET_COMPILE_OPTIONS("${NAME}" PRIVATE ${PQXX_COMPILE_OPTIONS})
+    TARGET_COMPILE_DEFINITIONS(
+        "${NAME}"
+        PRIVATE ${PQXX_PRIVATE_COMPILE_DEFINITIONS}
+        PUBLIC ${PQXX_PUBLIC_COMPILE_DEFINITIONS}
+    )
+
+    STRING(TOLOWER "${TYPE}" TYPE_LOWER)
+
+    INSTALL(
+        TARGETS "${NAME}"
+        EXPORT libpqxx-targets
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        COMPONENT ${TYPE_LOWER}_libraries
+    )
+ENDMACRO()
+
+
+PQXX_ADD_LIBRARY(pqxx STATIC)
+PQXX_ADD_LIBRARY(pqxx-shared SHARED)
+
+# libpq has to be marked PUBLIC for static libpqxx for linking purposes but can
+# be marked PRIVATE for the shared library
+TARGET_LINK_LIBRARIES(pqxx PUBLIC PostgreSQL::pq)
+TARGET_LINK_LIBRARIES(pqxx-shared PRIVATE PostgreSQL::pq)
+
+# Export alias to `pqxx` called `pqxx-static`
+ADD_LIBRARY(pqxx-static INTERFACE)
+TARGET_LINK_LIBRARIES(pqxx-static INTERFACE pqxx)
+INSTALL(TARGETS pqxx-static EXPORT libpqxx-targets)

@@ -9,9 +9,6 @@
 #ifndef PQXX_H_COMPILER_PUBLIC
 #define PQXX_H_COMPILER_PUBLIC
 
-// Workarounds & definitions that need to be included even in library's headers
-#include "pqxx/config-public-compiler.h"
-
 // Some compilers, Visual Studio in particular, don't seem to support the
 // standard's ISO-646 keywords out of the box.
 #include <ciso646>

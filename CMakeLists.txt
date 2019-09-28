@@ -8,6 +8,10 @@ SET(CMAKE_CXX_STANDARD 17)
 SET(CMAKE_CXX_STANDARD_REQUIRED ON)
 SET(CMAKE_CXX_EXTENSIONS OFF)
 
+INCLUDE(GNUInstallDirs)
+INCLUDE(CMakePackageConfigHelpers)
+INCLUDE(CTest)
+
 # Use & mark custom CMake modules for install
 LIST(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/CMakeModules/")
 INSTALL(
@@ -15,10 +19,6 @@ INSTALL(
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/libpqxx/"
     COMPONENT cmake
 )
-
-INCLUDE(GNUInstallDirs)
-INCLUDE(CMakePackageConfigHelpers)
-INCLUDE(CTest)
 
 
 IF(

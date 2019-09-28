@@ -97,16 +97,16 @@ INSTALL(
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/libpqxx"
     COMPONENT cmake
 )
-# EXPORT(EXPORT libpqxx-targets
-#     NAMESPACE "libpqxx::"
-#     FILE "${CMAKE_CURRENT_BINARY_DIR}/libpqxx-targets.cmake"
-# )
-# INSTALL(
-#     EXPORT libpqxx-targets
-#     NAMESPACE "libpqxx::"
-#     DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/libpqxx"
-#     COMPONENT cmake
-# )
+EXPORT(EXPORT libpqxx-targets
+    NAMESPACE "libpqxx::"
+    FILE "${CMAKE_CURRENT_BINARY_DIR}/libpqxx-targets.cmake"
+)
+INSTALL(
+    EXPORT libpqxx-targets
+    NAMESPACE "libpqxx::"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/libpqxx"
+    COMPONENT cmake
+)
 
 SET(PQXX_PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.pc")
 CONFIGURE_FILE("config/pkg-config.pc.in" "${PQXX_PKGCONFIG_FILE}" @ONLY)

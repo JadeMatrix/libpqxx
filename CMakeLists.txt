@@ -56,19 +56,21 @@ IF(
         "-Wwrite-strings"
         "-Wundef"
         "-Wunused"
-        "-Wextra-semi"
-        "-fvisibility=hidden"
-        "-fvisibility-inlines-hidden"
     )
     IF("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GCC")
         LIST(APPEND PQXX_COMPILE_OPTIONS
             "-fnothrow-opt"
-            "-Wattribute-alias"
+            "-Wattribute-alias=2"
+            "-Wextra-semi"
             "-Wlogical-op"
             "-Wrestrict"
             "-Wstringop-overflow"
             "-Wsuggest-override"
             "-Wzero-as-null-pointer-constant"
+            "-Warray-bounds=2"
+            "-Wduplicated-branches"
+            "-Wduplicated-cond"
+            "-Wtrampolines"
         )
     ENDIF()
 ELSEIF("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")

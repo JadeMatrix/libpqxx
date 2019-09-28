@@ -10,8 +10,8 @@ FIND_PACKAGE(PostgreSQL REQUIRED COMPONENTS pq)
 INCLUDE("${CMAKE_CURRENT_LIST_DIR}/libpqxx-targets.cmake")
 
 # Update libpqxx compile definitions for the current system
-# INCLUDE("${CMAKE_CURRENT_LIST_DIR}/CMakeModules/PQXXSystemConfig.cmake")
-# UNSET(PQXX_PRIVATE_COMPILE_DEFINITIONS)
+INCLUDE("${CMAKE_CURRENT_LIST_DIR}/CMakeModules/PQXXSystemConfig.cmake")
+UNSET(PQXX_PRIVATE_COMPILE_DEFINITIONS)
 # FOREACH(TARGET libpqxx::pqxx libpqxx::pqxx-shared)
 #     IF(TARGET ${TARGET})
 #         SET_TARGET_PROPERTIES(

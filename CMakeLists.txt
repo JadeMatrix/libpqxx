@@ -20,6 +20,8 @@ INSTALL(
     COMPONENT cmake
 )
 
+INCLUDE(PQXXSystemConfig)
+
 
 IF(
     "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GCC"

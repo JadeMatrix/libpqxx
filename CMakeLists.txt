@@ -24,6 +24,8 @@ INSTALL(
 INCLUDE(PQXXSystemConfig)
 
 
+OPTION(PQXX_MAINTAINER_MODE "Maintainter mode (treat warnings as errors)")
+OPTION(PQXX_ENABLE_AUDIT "Audit mode (sanitization etc.)")
 IF(
     "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GCC"
     OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang"
@@ -31,7 +33,6 @@ IF(
 )
     SET(PQXX_COMPILE_OPTIONS
         "-fstrict-enums"
-        "-Werror"
         "-Wall"
         "-pedantic"
         "-Wcast-align"
@@ -73,8 +74,23 @@ IF(
             "-Wtrampolines"
         )
     ENDIF()
+    IF(PQXX_MAINTAINER_MODE)
+        LIST(APPEND PQXX_COMPILE_OPTIONS "-Werror")
+    ENDIF()
+    IF(PQXX_ENABLE_AUDIT)
+        LIST(APPEND PQXX_COMPILE_OPTIONS
+            "-fsanitize=address"
+            "-fsanitize=leak"
+            "-fsanitize=undefined"
+            "-fsanitize-address-use-after-scope"
+            "-fstack-protector-all"
+        )
+    ENDIF()
 ELSEIF("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
-    SET(PQXX_COMPILE_OPTIONS "/Wall" "/WX")
+    SET(PQXX_COMPILE_OPTIONS "/Wall")
+    IF(PQXX_MAINTAINER_MODE)
+        LIST(APPEND PQXX_COMPILE_OPTIONS "/WX")
+    ENDIF()
 ENDIF()
 
 
